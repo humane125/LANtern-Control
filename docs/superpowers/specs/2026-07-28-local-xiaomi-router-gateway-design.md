@@ -74,7 +74,7 @@ based only on the outgoing request.
 
 - Bind exclusively to `127.0.0.1`; reject non-loopback hosts and unexpected
   origins.
-- Use an HTTP-only, `SameSite=Strict` session cookie and require a per-session
+- Use an `HttpOnly`, `SameSite=Strict` session cookie and require a per-session
   CSRF token for mutations.
 - Redact passwords, Xiaomi tokens, device identifiers, and request bodies from
   logs.
