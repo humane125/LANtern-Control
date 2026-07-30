@@ -108,8 +108,8 @@ public partial class MainWindow : Window
         UpdateButtons();
         try
         {
-            SetStatus("Scanning this LAN…", null);
-            await engine.ScanAsync();
+            SetStatus("Refreshing Windows device cache…", null);
+            await engine.RefreshNeighborsAsync();
             SetStatus("Control active", true);
         }
         catch (Exception exception)

@@ -115,7 +115,7 @@
                     <Button x:Name="ScanButton"
                             Click="ScanButton_OnClick"
                             IsEnabled="False"
-                            Content="Scan now" />
+                            Content="Refresh devices" />
                     <Button x:Name="StopButton"
                             Click="StopButton_OnClick"
                             IsEnabled="False"
@@ -232,12 +232,12 @@
                 <StackPanel x:Name="EmptyState"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
-                    <TextBlock Text="No devices scanned yet"
+                    <TextBlock Text="No devices observed yet"
                                HorizontalAlignment="Center"
                                FontSize="18"
                                FontWeight="SemiBold" />
                     <TextBlock Margin="0,6,0,0"
-                               Text="Choose an adapter and start control to discover this LAN."
+                               Text="Choose an adapter and start control to observe this LAN."
                                Foreground="{StaticResource SecondaryText}" />
                 </StackPanel>
             </Grid>

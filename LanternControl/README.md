@@ -7,9 +7,9 @@ router dashboard.
 ## What it does
 
 - Detects ordinary Ethernet and Wi-Fi LAN adapters at runtime.
-- Discovers IPv4 devices on the selected subnet.
-- Paces discovery at no more than 25 broadcast probes per second and performs
-  automatic full rescans no more than once per minute.
+- Discovers IPv4 devices from the Windows neighbor cache and normal LAN traffic.
+- Refreshes the passive device list every five seconds without sweeping or
+  probing every address on the subnet.
 - Shows live download and upload rates for devices with an active control rule.
 - Applies independent download/upload limits in `KB/s`.
 - Pauses a device's IPv4 internet while the application is running.
@@ -43,6 +43,11 @@ driver when launched as Administrator.
 No rule changes the router permanently. Starting the app does not reroute
 unlimited devices; a device is intercepted only while it has a nonzero limit or
 Pause enabled. Saved rules activate only when control is started.
+
+Device discovery is passive to avoid packet loss on weak routers. Devices
+already present in the Windows neighbor cache appear immediately; others appear
+after they generate normal LAN traffic. **Refresh devices** rereads that cache
+and does not send a subnet scan.
 
 ## Compatibility limits
 

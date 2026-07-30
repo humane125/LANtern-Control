@@ -8,7 +8,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>LANtern Control</AssemblyName>
     <RootNamespace>Lantern.App</RootNamespace>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <Product>LANtern Control</Product>
     <Description>Router-independent IPv4 LAN bandwidth control for Windows.</Description>
     <Authors>LANtern Control</Authors>

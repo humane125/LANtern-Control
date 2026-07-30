@@ -14,7 +14,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private readonly object sendSync = new();
     private readonly TrafficPolicy policy;
     private readonly DeviceRegistry registry;
-    private readonly LanScanProfile scanProfile = LanScanProfile.HomeRouterSafe;
+    private readonly PassiveDiscoveryProfile discoveryProfile =
+        PassiveDiscoveryProfile.Default;
     private readonly ConcurrentDictionary<IPAddress, PhysicalAddress> clients = new();
     private readonly ConcurrentDictionary<string, byte> resolvingNames =
         new(StringComparer.OrdinalIgnoreCase);
@@ -91,15 +92,15 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 clients,
                 policy);
 
-            RaiseStatus($"Scanning {adapter.LocalAddress}/{adapter.PrefixLength}…");
-            await ScanAsync(cancellationToken);
-            await Task.Delay(800, cancellationToken);
+            RaiseStatus("Loading devices already observed by Windows…");
+            await RefreshNeighborsAsync(cancellationToken);
 
             controlling = true;
             PoisonClients();
             engineCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             backgroundTask = RunMaintenanceAsync(engineCancellation.Token);
-            RaiseStatus("Control active — only devices with a limit or Pause rule are intercepted.");
+            RaiseStatus(
+                "Control active — device discovery is passive and sends no subnet sweep.");
         }
         catch
         {
@@ -108,26 +109,32 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
     }
 
-    public async Task ScanAsync(CancellationToken cancellationToken = default)
+    public async Task RefreshNeighborsAsync(CancellationToken cancellationToken = default)
     {
         var activeProfile = profile ??
-            throw new InvalidOperationException("Select and start an adapter before scanning.");
-        foreach (var address in SubnetScanner.EnumerateHosts(
-                     activeProfile.LocalAddress,
-                     activeProfile.PrefixLength))
+            throw new InvalidOperationException("Select and start an adapter before refreshing.");
+        var neighbors = await WindowsNeighborCache.ReadAsync(
+            activeProfile,
+            cancellationToken);
+        foreach (var neighbor in neighbors)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (address.Equals(activeProfile.LocalAddress))
+            if (neighbor.Address.Equals(activeProfile.GatewayAddress))
             {
+                registry.Observe(
+                    neighbor.Address,
+                    neighbor.MacAddress,
+                    DateTimeOffset.UtcNow,
+                    "Gateway");
                 continue;
             }
 
-            SendPacket(
-                EthernetFrameCodec.BuildArpRequest(
-                    activeProfile.LocalMac,
-                    activeProfile.LocalAddress,
-                    address));
-            await Task.Delay(scanProfile.ProbeInterval, cancellationToken);
+            clients[neighbor.Address] = neighbor.MacAddress;
+            frameRouter?.UpdateClient(neighbor.Address, neighbor.MacAddress);
+            registry.Observe(
+                neighbor.Address,
+                neighbor.MacAddress,
+                DateTimeOffset.UtcNow);
+            _ = ResolveNameAsync(neighbor.Address, neighbor.MacAddress);
         }
     }
 
@@ -296,7 +303,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
     {
         await Task.WhenAll(
             RunPoisonLoopAsync(cancellationToken),
-            RunAutomaticScanLoopAsync(cancellationToken));
+            RunNeighborRefreshLoopAsync(cancellationToken));
     }
 
     private async Task RunPoisonLoopAsync(CancellationToken cancellationToken)
@@ -315,19 +322,19 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
     }
 
-    private async Task RunAutomaticScanLoopAsync(CancellationToken cancellationToken)
+    private async Task RunNeighborRefreshLoopAsync(CancellationToken cancellationToken)
     {
-        var scanTimer = new PeriodicTimer(scanProfile.AutomaticRescanInterval);
+        var refreshTimer = new PeriodicTimer(discoveryProfile.RefreshInterval);
         try
         {
-            while (await scanTimer.WaitForNextTickAsync(cancellationToken))
+            while (await refreshTimer.WaitForNextTickAsync(cancellationToken))
             {
-                await ScanAsync(cancellationToken);
+                await RefreshNeighborsAsync(cancellationToken);
             }
         }
         finally
         {
-            scanTimer.Dispose();
+            refreshTimer.Dispose();
         }
     }
 
