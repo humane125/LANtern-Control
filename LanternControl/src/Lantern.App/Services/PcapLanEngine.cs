@@ -14,6 +14,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private readonly object sendSync = new();
     private readonly TrafficPolicy policy;
     private readonly DeviceRegistry registry;
+    private readonly LanScanProfile scanProfile = LanScanProfile.HomeRouterSafe;
     private readonly ConcurrentDictionary<IPAddress, PhysicalAddress> clients = new();
     private readonly ConcurrentDictionary<string, byte> resolvingNames =
         new(StringComparer.OrdinalIgnoreCase);
@@ -126,7 +127,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
                     activeProfile.LocalMac,
                     activeProfile.LocalAddress,
                     address));
-            await Task.Delay(2, cancellationToken);
+            await Task.Delay(scanProfile.ProbeInterval, cancellationToken);
         }
     }
 
@@ -293,24 +294,40 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
     private async Task RunMaintenanceAsync(CancellationToken cancellationToken)
     {
+        await Task.WhenAll(
+            RunPoisonLoopAsync(cancellationToken),
+            RunAutomaticScanLoopAsync(cancellationToken));
+    }
+
+    private async Task RunPoisonLoopAsync(CancellationToken cancellationToken)
+    {
         var poisonTimer = new PeriodicTimer(TimeSpan.FromSeconds(2));
-        var scanCounter = 0;
         try
         {
             while (await poisonTimer.WaitForNextTickAsync(cancellationToken))
             {
                 PoisonClients();
-                scanCounter++;
-                if (scanCounter >= 5)
-                {
-                    scanCounter = 0;
-                    await ScanAsync(cancellationToken);
-                }
             }
         }
         finally
         {
             poisonTimer.Dispose();
+        }
+    }
+
+    private async Task RunAutomaticScanLoopAsync(CancellationToken cancellationToken)
+    {
+        var scanTimer = new PeriodicTimer(scanProfile.AutomaticRescanInterval);
+        try
+        {
+            while (await scanTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                await ScanAsync(cancellationToken);
+            }
+        }
+        finally
+        {
+            scanTimer.Dispose();
         }
     }
 

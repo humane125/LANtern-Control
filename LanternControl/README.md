@@ -8,6 +8,8 @@ router dashboard.
 
 - Detects ordinary Ethernet and Wi-Fi LAN adapters at runtime.
 - Discovers IPv4 devices on the selected subnet.
+- Paces discovery at no more than 25 broadcast probes per second and performs
+  automatic full rescans no more than once per minute.
 - Shows live download and upload rates for devices with an active control rule.
 - Applies independent download/upload limits in `KB/s`.
 - Pauses a device's IPv4 internet while the application is running.
