@@ -8,7 +8,7 @@ router dashboard.
 
 - Detects ordinary Ethernet and Wi-Fi LAN adapters at runtime.
 - Discovers IPv4 devices on the selected subnet.
-- Shows live per-device download and upload rates after control starts.
+- Shows live download and upload rates for devices with an active control rule.
 - Applies independent download/upload limits in `KB/s`.
 - Pauses a device's IPv4 internet while the application is running.
 - Saves rules per MAC address.
@@ -38,8 +38,9 @@ driver when launched as Administrator.
 6. Use **Pause internet** to stop a device's IPv4 internet.
 7. Click **Stop & restore** before changing networks or closing the program.
 
-No rule changes the router permanently. Saved rules activate only when control
-is started.
+No rule changes the router permanently. Starting the app does not reroute
+unlimited devices; a device is intercepted only while it has a nonzero limit or
+Pause enabled. Saved rules activate only when control is started.
 
 ## Compatibility limits
 

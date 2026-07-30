@@ -27,6 +27,14 @@ public sealed class TrafficPolicy
             ? limiters.Rule
             : new TrafficRule(false, 0, 0);
 
+    public bool RequiresInterception(string macAddress)
+    {
+        var rule = GetRule(macAddress);
+        return rule.PauseInternet ||
+               rule.DownloadKiloBytesPerSecond > 0 ||
+               rule.UploadKiloBytesPerSecond > 0;
+    }
+
     public void RemoveRule(string macAddress) => rules.TryRemove(NormalizeMac(macAddress), out _);
 
     public bool ShouldForward(string macAddress, TrafficDirection direction, int byteCount)

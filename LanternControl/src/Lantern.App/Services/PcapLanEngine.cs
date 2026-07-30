@@ -95,9 +95,10 @@ public sealed class PcapLanEngine : IAsyncDisposable
             await Task.Delay(800, cancellationToken);
 
             controlling = true;
+            PoisonClients();
             engineCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             backgroundTask = RunMaintenanceAsync(engineCancellation.Token);
-            RaiseStatus("Control active — traffic is passing through this computer.");
+            RaiseStatus("Control active — only devices with a limit or Pause rule are intercepted.");
         }
         catch
         {
@@ -175,6 +176,41 @@ public sealed class PcapLanEngine : IAsyncDisposable
         gatewayMac = null;
         profile = null;
         RaiseStatus("Stopped. Corrective ARP mappings were sent.");
+    }
+
+    public async Task ApplyRuleAsync(string macAddress, TrafficRule rule)
+    {
+        var wasIntercepted = policy.RequiresInterception(macAddress);
+        policy.SetRule(macAddress, rule);
+        var isIntercepted = policy.RequiresInterception(macAddress);
+        if (!controlling || wasIntercepted == isIntercepted)
+        {
+            return;
+        }
+
+        var normalizedMac = TrafficPolicy.NormalizeMac(macAddress);
+        var foundClient = clients
+            .Where(
+                pair =>
+                    string.Equals(
+                        TrafficPolicy.NormalizeMac(pair.Value.ToString()),
+                        normalizedMac,
+                        StringComparison.Ordinal))
+            .Take(1)
+            .ToArray();
+        if (foundClient.Length == 0)
+        {
+            return;
+        }
+
+        if (isIntercepted)
+        {
+            PoisonClient(foundClient[0]);
+        }
+        else
+        {
+            await RestoreClientAsync(foundClient[0]);
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -289,14 +325,10 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
         foreach (var pair in clients)
         {
-            var frames = ArpInterceptionFrames.BuildPoison(
-                activeProfile.LocalMac,
-                activeProfile.GatewayAddress,
-                activeGatewayMac,
-                pair.Key,
-                pair.Value);
-            SendPacket(frames.ToClient);
-            SendPacket(frames.ToGateway);
+            if (policy.RequiresInterception(pair.Value.ToString()))
+            {
+                PoisonClient(pair);
+            }
         }
     }
 
@@ -313,17 +345,61 @@ public sealed class PcapLanEngine : IAsyncDisposable
         {
             foreach (var pair in clients)
             {
-                var frames = ArpInterceptionFrames.BuildRestore(
-                    activeGatewayMac,
-                    activeProfile.GatewayAddress,
-                    pair.Value,
-                    pair.Key);
-                SendPacket(frames.ToClient);
-                SendPacket(frames.ToGateway);
+                SendRestoreFrames(pair, activeProfile, activeGatewayMac);
             }
 
             await Task.Delay(120);
         }
+    }
+
+    private void PoisonClient(KeyValuePair<IPAddress, PhysicalAddress> client)
+    {
+        var activeProfile = profile;
+        var activeGatewayMac = gatewayMac;
+        if (!controlling || activeProfile is null || activeGatewayMac is null)
+        {
+            return;
+        }
+
+        var frames = ArpInterceptionFrames.BuildPoison(
+            activeProfile.LocalMac,
+            activeProfile.GatewayAddress,
+            activeGatewayMac,
+            client.Key,
+            client.Value);
+        SendPacket(frames.ToClient);
+        SendPacket(frames.ToGateway);
+    }
+
+    private async Task RestoreClientAsync(
+        KeyValuePair<IPAddress, PhysicalAddress> client)
+    {
+        var activeProfile = profile;
+        var activeGatewayMac = gatewayMac;
+        if (activeProfile is null || activeGatewayMac is null)
+        {
+            return;
+        }
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            SendRestoreFrames(client, activeProfile, activeGatewayMac);
+            await Task.Delay(120);
+        }
+    }
+
+    private void SendRestoreFrames(
+        KeyValuePair<IPAddress, PhysicalAddress> client,
+        AdapterProfile activeProfile,
+        PhysicalAddress activeGatewayMac)
+    {
+        var frames = ArpInterceptionFrames.BuildRestore(
+            activeGatewayMac,
+            activeProfile.GatewayAddress,
+            client.Value,
+            client.Key);
+        SendPacket(frames.ToClient);
+        SendPacket(frames.ToGateway);
     }
 
     private void RespondToArpRequest(ArpFrameInfo request)
@@ -339,7 +415,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
 
         if (request.TargetIp.Equals(activeProfile.GatewayAddress) &&
-            clients.TryGetValue(request.SenderIp, out var requestingClient))
+            clients.TryGetValue(request.SenderIp, out var requestingClient) &&
+            policy.RequiresInterception(requestingClient.ToString()))
         {
             var frames = ArpInterceptionFrames.BuildPoison(
                 activeProfile.LocalMac,
@@ -352,7 +429,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
 
         if (request.SenderIp.Equals(activeProfile.GatewayAddress) &&
-            clients.TryGetValue(request.TargetIp, out var requestedClient))
+            clients.TryGetValue(request.TargetIp, out var requestedClient) &&
+            policy.RequiresInterception(requestedClient.ToString()))
         {
             var frames = ArpInterceptionFrames.BuildPoison(
                 activeProfile.LocalMac,

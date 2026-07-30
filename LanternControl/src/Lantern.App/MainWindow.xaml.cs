@@ -197,15 +197,15 @@ public partial class MainWindow : Window
         preferences.DownloadKiloBytesPerSecond = device.DownloadLimit;
         preferences.UploadKiloBytesPerSecond = device.UploadLimit;
         preferences.PauseInternet = device.PauseInternet;
-        policy.SetRule(
-            device.MacKey,
-            new TrafficRule(
-                device.PauseInternet,
-                device.DownloadLimit,
-                device.UploadLimit));
 
         try
         {
+            await engine.ApplyRuleAsync(
+                device.MacKey,
+                new TrafficRule(
+                    device.PauseInternet,
+                    device.DownloadLimit,
+                    device.UploadLimit));
             await settingsStore.SaveAsync(settings);
             await Dispatcher.InvokeAsync(
                 () => DetailStatusText.Text =
@@ -213,7 +213,8 @@ public partial class MainWindow : Window
                         ? $"Rule applied to {device.DisplayName}."
                         : $"Rule saved for {device.DisplayName}; it activates when control starts.");
         }
-        catch (IOException exception)
+        catch (Exception exception) when (
+            exception is IOException or InvalidOperationException)
         {
             await Dispatcher.InvokeAsync(() => DetailStatusText.Text = exception.Message);
         }

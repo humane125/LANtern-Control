@@ -59,6 +59,22 @@ public sealed class TrafficControlTests
     }
 
     [Fact]
+    public void TrafficPolicy_OnlyActiveLimitsRequireArpInterception()
+    {
+        var policy = new TrafficPolicy();
+        policy.SetRule("00:11:22:33:44:01", new TrafficRule(false, 0, 0));
+        policy.SetRule("00:11:22:33:44:02", new TrafficRule(false, 100, 0));
+        policy.SetRule("00:11:22:33:44:03", new TrafficRule(false, 0, 50));
+        policy.SetRule("00:11:22:33:44:04", new TrafficRule(true, 0, 0));
+
+        Assert.False(policy.RequiresInterception("00:11:22:33:44:01"));
+        Assert.True(policy.RequiresInterception("00:11:22:33:44:02"));
+        Assert.True(policy.RequiresInterception("00:11:22:33:44:03"));
+        Assert.True(policy.RequiresInterception("00:11:22:33:44:04"));
+        Assert.False(policy.RequiresInterception("00:11:22:33:44:05"));
+    }
+
+    [Fact]
     public void DeviceRegistry_ComputesIndependentUploadAndDownloadRates()
     {
         var start = DateTimeOffset.Parse("2026-07-30T12:00:00Z");
