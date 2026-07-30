@@ -6,3 +6,6 @@ playwright-report/
 test-results/
 release/
 *.log
+**/bin/
+**/obj/
+LanternControl/release/

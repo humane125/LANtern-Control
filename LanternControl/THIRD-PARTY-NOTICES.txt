@@ -1,0 +1,13 @@
+LANtern Control includes:
+
+SharpPcap
+Copyright (c) Tamir Gal, Chris Morgan and contributors
+Licensed under the MIT License
+https://github.com/dotpcap/sharppcap
+
+PacketDotNet
+Copyright (c) PacketDotNet contributors
+Licensed under the MIT License
+https://github.com/dotpcap/packetnet
+
+The full license texts and source repositories are available at the links above.
