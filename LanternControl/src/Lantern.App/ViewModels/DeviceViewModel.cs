@@ -129,7 +129,7 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     {
         MacKey = snapshot.MacAddress.ToString();
         MacAddress = FormatMac(MacKey);
-        downloadLimit = Math.Max(0, preferences?.DownloadKiloBytesPerSecond ?? 0);
+        downloadLimit = 0;
         uploadLimit = Math.Max(0, preferences?.UploadKiloBytesPerSecond ?? 0);
         pauseInternet = !isProtectedDevice && (preferences?.PauseInternet ?? false);
         OnPropertyChanged(nameof(DownloadLimit));

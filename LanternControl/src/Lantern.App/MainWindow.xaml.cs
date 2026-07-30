@@ -194,18 +194,18 @@ public partial class MainWindow : Window
         var preferences = settings.Devices.TryGetValue(device.MacKey, out var existing)
             ? existing
             : settings.Devices[device.MacKey] = new DevicePreferences();
-        preferences.DownloadKiloBytesPerSecond = device.DownloadLimit;
-        preferences.UploadKiloBytesPerSecond = device.UploadLimit;
-        preferences.PauseInternet = device.PauseInternet;
+        var safeRule = new TrafficRule(
+                device.PauseInternet,
+                device.DownloadLimit,
+                device.UploadLimit)
+            .ForClientSafeMode();
+        preferences.DownloadKiloBytesPerSecond = safeRule.DownloadKiloBytesPerSecond;
+        preferences.UploadKiloBytesPerSecond = safeRule.UploadKiloBytesPerSecond;
+        preferences.PauseInternet = safeRule.PauseInternet;
 
         try
         {
-            await engine.ApplyRuleAsync(
-                device.MacKey,
-                new TrafficRule(
-                    device.PauseInternet,
-                    device.DownloadLimit,
-                    device.UploadLimit));
+            await engine.ApplyRuleAsync(device.MacKey, safeRule);
             await settingsStore.SaveAsync(settings);
             await Dispatcher.InvokeAsync(
                 () => DetailStatusText.Text =
@@ -229,7 +229,8 @@ public partial class MainWindow : Window
                 new TrafficRule(
                     pair.Value.PauseInternet,
                     pair.Value.DownloadKiloBytesPerSecond,
-                    pair.Value.UploadKiloBytesPerSecond));
+                    pair.Value.UploadKiloBytesPerSecond)
+                    .ForClientSafeMode());
         }
     }
 

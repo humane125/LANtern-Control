@@ -1,9 +1,27 @@
 using System.Net;
 using System.Net.NetworkInformation;
+using Lantern.Core.Control;
 
 namespace Lantern.Core.Networking;
 
-public sealed record ArpPeerFrames(byte[] ToClient, byte[] ToGateway);
+public sealed record ArpPeerFrames(byte[] ToClient, byte[] ToGateway)
+{
+    public IReadOnlyList<byte[]> Select(InterceptionTargets targets)
+    {
+        var selected = new List<byte[]>(2);
+        if (targets.HasFlag(InterceptionTargets.Client))
+        {
+            selected.Add(ToClient);
+        }
+
+        if (targets.HasFlag(InterceptionTargets.Gateway))
+        {
+            selected.Add(ToGateway);
+        }
+
+        return selected;
+    }
+}
 
 public static class ArpInterceptionFrames
 {

@@ -146,7 +146,7 @@
                       StrokeThickness="1.8"
                       Data="M8,1 A7,7 0 1 0 8,15 A7,7 0 1 0 8,1 M8,5 L8,9 M8,12 L8,12.2" />
                 <TextBlock Grid.Column="1"
-                           Text="IPv4 control works while this app is running. Devices must share this LAN; guest isolation or ARP protection can block control."
+                           Text="Stable mode: Pause and upload limits intercept only the target device. Router-side download limits are disabled to prevent network-wide lag."
                            Foreground="#B9CBDC"
                            VerticalAlignment="Center" />
             </Grid>
@@ -194,13 +194,13 @@
                                             Width="1*"
                                             IsReadOnly="True"
                                             Binding="{Binding UploadRate}" />
-                        <DataGridTemplateColumn Header="DOWN LIMIT (KB/s)" Width="1.2*">
+                        <DataGridTemplateColumn Header="DOWN LIMIT" Width="1.2*">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBox Width="92"
                                              HorizontalAlignment="Left"
-                                             IsEnabled="{Binding CanControl}"
-                                             ToolTip="0 means unlimited"
+                                             IsEnabled="False"
+                                             ToolTip="Disabled in stable mode because it requires router-side ARP interception"
                                              Text="{Binding DownloadLimit, UpdateSourceTrigger=LostFocus}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>

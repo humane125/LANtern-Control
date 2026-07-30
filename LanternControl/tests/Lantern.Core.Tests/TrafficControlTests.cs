@@ -74,6 +74,37 @@ public sealed class TrafficControlTests
         Assert.False(policy.RequiresInterception("00:11:22:33:44:05"));
     }
 
+    [Theory]
+    [InlineData(false, 0, 0, InterceptionTargets.None)]
+    [InlineData(true, 0, 0, InterceptionTargets.Client)]
+    [InlineData(false, 0, 50, InterceptionTargets.Client)]
+    [InlineData(false, 100, 0, InterceptionTargets.Gateway)]
+    [InlineData(false, 100, 50, InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    public void TrafficPolicy_InterceptionTargetsAvoidUnneededArpSpoofing(
+        bool pause,
+        int downloadLimit,
+        int uploadLimit,
+        InterceptionTargets expected)
+    {
+        const string mac = "00:11:22:33:44:55";
+        var policy = new TrafficPolicy();
+        policy.SetRule(mac, new TrafficRule(pause, downloadLimit, uploadLimit));
+
+        Assert.Equal(expected, policy.GetInterceptionTargets(mac));
+    }
+
+    [Fact]
+    public void TrafficRule_ClientSafeModeDisablesRouterSideDownloadInterception()
+    {
+        var requested = new TrafficRule(false, 250, 75);
+
+        var safe = requested.ForClientSafeMode();
+
+        Assert.Equal(0, safe.DownloadKiloBytesPerSecond);
+        Assert.Equal(75, safe.UploadKiloBytesPerSecond);
+        Assert.False(safe.PauseInternet);
+    }
+
     [Fact]
     public void DeviceRegistry_ComputesIndependentUploadAndDownloadRates()
     {

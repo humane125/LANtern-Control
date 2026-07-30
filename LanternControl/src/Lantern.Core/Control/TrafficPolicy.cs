@@ -2,6 +2,14 @@ using System.Collections.Concurrent;
 
 namespace Lantern.Core.Control;
 
+[Flags]
+public enum InterceptionTargets
+{
+    None = 0,
+    Client = 1,
+    Gateway = 2,
+}
+
 public sealed class TrafficPolicy
 {
     private readonly ConcurrentDictionary<string, DeviceLimiters> rules =
@@ -29,10 +37,29 @@ public sealed class TrafficPolicy
 
     public bool RequiresInterception(string macAddress)
     {
+        return GetInterceptionTargets(macAddress) != InterceptionTargets.None;
+    }
+
+    public InterceptionTargets GetInterceptionTargets(string macAddress)
+    {
         var rule = GetRule(macAddress);
-        return rule.PauseInternet ||
-               rule.DownloadKiloBytesPerSecond > 0 ||
-               rule.UploadKiloBytesPerSecond > 0;
+        if (rule.PauseInternet)
+        {
+            return InterceptionTargets.Client;
+        }
+
+        var targets = InterceptionTargets.None;
+        if (rule.UploadKiloBytesPerSecond > 0)
+        {
+            targets |= InterceptionTargets.Client;
+        }
+
+        if (rule.DownloadKiloBytesPerSecond > 0)
+        {
+            targets |= InterceptionTargets.Gateway;
+        }
+
+        return targets;
     }
 
     public void RemoveRule(string macAddress) => rules.TryRemove(NormalizeMac(macAddress), out _);

@@ -11,8 +11,8 @@ router dashboard.
 - Refreshes the passive device list every five seconds without sweeping or
   probing every address on the subnet.
 - Shows live download and upload rates for devices with an active control rule.
-- Applies independent download/upload limits in `KB/s`.
-- Pauses a device's IPv4 internet while the application is running.
+- Applies upload limits in `KB/s` without modifying the router's ARP cache.
+- Pauses a device's IPv4 internet using target-side interception only.
 - Saves rules per MAC address.
 - Sends corrective ARP mappings when control stops or the window closes.
 
@@ -48,6 +48,11 @@ Device discovery is passive to avoid packet loss on weak routers. Devices
 already present in the Windows neighbor cache appear immediately; others appear
 after they generate normal LAN traffic. **Refresh devices** rereads that cache
 and does not send a subnet scan.
+
+Stable mode deliberately disables download limits. Exact download limiting
+requires redirecting traffic at the gateway, and testing showed that router-side
+ARP interception causes severe packet loss on the Xiaomi Mi Router 4A stock
+firmware. Pause and upload-only controls never poison the gateway in this mode.
 
 ## Compatibility limits
 

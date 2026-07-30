@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.NetworkInformation;
+using Lantern.Core.Control;
 using Lantern.Core.Networking;
 
 namespace Lantern.Core.Tests;
@@ -48,5 +49,39 @@ public sealed class ArpInterceptionFramesTests
         Assert.Equal(GatewayMac, toClient.SenderMac);
         Assert.True(EthernetFrameCodec.TryParseArp(frames.ToGateway, out var toGateway));
         Assert.Equal(ClientMac, toGateway.SenderMac);
+    }
+
+    [Fact]
+    public void Select_ClientTargetOmitsTheGatewayPoisonFrame()
+    {
+        var frames = ArpInterceptionFrames.BuildPoison(
+            LocalMac,
+            GatewayIp,
+            GatewayMac,
+            ClientIp,
+            ClientMac);
+
+        var selected = frames.Select(InterceptionTargets.Client);
+
+        Assert.Single(selected);
+        Assert.Equal(frames.ToClient, selected[0]);
+    }
+
+    [Fact]
+    public void Select_BothTargetsReturnsBothPeerFrames()
+    {
+        var frames = ArpInterceptionFrames.BuildPoison(
+            LocalMac,
+            GatewayIp,
+            GatewayMac,
+            ClientIp,
+            ClientMac);
+
+        var selected = frames.Select(
+            InterceptionTargets.Client | InterceptionTargets.Gateway);
+
+        Assert.Equal(2, selected.Count);
+        Assert.Equal(frames.ToClient, selected[0]);
+        Assert.Equal(frames.ToGateway, selected[1]);
     }
 }
