@@ -11,10 +11,14 @@ public enum ArpOperation : ushort
 
 public readonly record struct ArpFrameInfo(
     ArpOperation Operation,
+    PhysicalAddress EthernetSourceMac,
     PhysicalAddress SenderMac,
     IPAddress SenderIp,
     PhysicalAddress TargetMac,
-    IPAddress TargetIp);
+    IPAddress TargetIp)
+{
+    public bool HasConsistentSender => EthernetSourceMac.Equals(SenderMac);
+}
 
 public readonly record struct Ipv4FrameInfo(
     int HeaderOffset,
@@ -129,6 +133,7 @@ public static class EthernetFrameCodec
 
         result = new ArpFrameInfo(
             (ArpOperation)operationValue,
+            new PhysicalAddress(frame.Slice(6, 6).ToArray()),
             new PhysicalAddress(arp.Slice(8, 6).ToArray()),
             new IPAddress(arp.Slice(14, 4)),
             new PhysicalAddress(arp.Slice(18, 6).ToArray()),

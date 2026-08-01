@@ -163,6 +163,35 @@ public sealed class TrafficControlTests
         Assert.Equal(IPAddress.Parse("192.168.31.99"), snapshot.IpAddress);
     }
 
+    [Fact]
+    public void DeviceRegistry_RememberingCachedNeighborDoesNotRefreshLastSeen()
+    {
+        var start = DateTimeOffset.Parse("2026-08-01T12:00:00Z");
+        var registry = new DeviceRegistry(start);
+        var mac = PhysicalAddress.Parse("0E4F69CCE4F0");
+        registry.Observe(IPAddress.Parse("192.168.31.213"), mac, start);
+
+        registry.Remember(IPAddress.Parse("192.168.31.213"), mac, start.AddMinutes(5));
+
+        var snapshot = Assert.Single(registry.Peek());
+        Assert.Equal(start, snapshot.LastSeen);
+    }
+
+    [Fact]
+    public void DeviceRegistry_TrafficRefreshesLastSeen()
+    {
+        var start = DateTimeOffset.Parse("2026-08-01T12:00:00Z");
+        var trafficAt = start.AddSeconds(10);
+        var registry = new DeviceRegistry(start);
+        var mac = PhysicalAddress.Parse("0E4F69CCE4F0");
+        registry.Observe(IPAddress.Parse("192.168.31.213"), mac, start);
+
+        registry.RecordTraffic(mac, TrafficDirection.Download, 100, trafficAt);
+
+        var snapshot = Assert.Single(registry.Peek());
+        Assert.Equal(trafficAt, snapshot.LastSeen);
+    }
+
     private sealed class ManualClock
     {
         public double Seconds { get; set; }

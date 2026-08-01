@@ -7,6 +7,26 @@ namespace Lantern.Core.Tests;
 
 public sealed class ArpInterceptionFramesTests
 {
+    [Fact]
+    public void ControllerProtectionFrame_IsNotAnAuthenticClientObservation()
+    {
+        var controllerMac = PhysicalAddress.Parse("345A6063C052");
+        var gatewayMac = PhysicalAddress.Parse("64644A380A15");
+        var clientMac = PhysicalAddress.Parse("0E4F69CCE4F0");
+        var frames = ArpInterceptionFrames.BuildControllerProtection(
+            controllerMac,
+            IPAddress.Parse("192.168.31.247"),
+            gatewayMac,
+            IPAddress.Parse("192.168.31.1"),
+            clientMac,
+            IPAddress.Parse("192.168.31.213"));
+
+        Assert.True(EthernetFrameCodec.TryParseArp(frames.ClientToController, out var arp));
+        Assert.Equal(controllerMac, arp.EthernetSourceMac);
+        Assert.Equal(clientMac, arp.SenderMac);
+        Assert.False(arp.HasConsistentSender);
+    }
+
     private static readonly PhysicalAddress LocalMac = PhysicalAddress.Parse("345A6063C052");
     private static readonly PhysicalAddress GatewayMac = PhysicalAddress.Parse("64644A380A15");
     private static readonly PhysicalAddress ClientMac = PhysicalAddress.Parse("E261190DBD54");

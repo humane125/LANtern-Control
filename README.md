@@ -13,6 +13,7 @@ router dashboard.
 - Detects ordinary Ethernet and Wi-Fi LAN adapters at runtime.
 - Discovers IPv4 devices from the Windows neighbor cache and normal LAN traffic.
 - Resolves device names through reverse DNS, NetBIOS, mDNS, and passively observed DHCP hostnames, with inline saved aliases.
+- Marks clients offline after missed liveness checks and hides them after 45 seconds while retaining saved names and limits.
 - Refreshes the passive device list every five seconds without sweeping or
   probing every address on the subnet.
 - Shows live download and upload rates for every redirected device.

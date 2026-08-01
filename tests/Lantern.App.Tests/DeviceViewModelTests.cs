@@ -229,6 +229,27 @@ public sealed class DeviceViewModelTests
     }
 
     [Fact]
+    public void SetPresence_ShowsOfflineWithoutDiscardingTheDevice()
+    {
+        var now = DateTimeOffset.Parse("2026-08-01T12:00:00Z");
+        var snapshot = new DeviceSnapshot(
+            PhysicalAddress.Parse("0E4F69CCE4F0"),
+            IPAddress.Parse("192.168.31.213"),
+            "POCO-F6",
+            now,
+            now,
+            0,
+            0);
+        var viewModel = new DeviceViewModel(_ => Task.CompletedTask);
+        viewModel.Initialize(snapshot, null, false, "Online");
+
+        viewModel.SetPresence(false);
+
+        Assert.False(viewModel.IsOnline);
+        Assert.Equal("Offline", viewModel.ProtectedReason);
+    }
+
+    [Fact]
     public void HasActiveRule_IsFalseForProtectedDevicesEvenWithSavedLimits()
     {
         var now = DateTimeOffset.Parse("2026-07-31T00:00:00Z");
