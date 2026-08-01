@@ -35,6 +35,23 @@ requiring access to the router's administration dashboard.
 - Check GitHub Releases for optional application updates.
 - Choose between an installer and a portable executable.
 
+## Screenshots
+
+The screenshots below use synthetic demo data and do not contain information
+from a real network.
+
+### Network overview
+
+![LANtern Control network overview](assets/screenshots/overview.png)
+
+### Visited domains
+
+![LANtern Control visited domains](assets/screenshots/visited-domains.png)
+
+### Domain rules
+
+![LANtern Control domain rules](assets/screenshots/domain-rules.png)
+
 ## Requirements
 
 - Windows 10 or Windows 11, x64.
