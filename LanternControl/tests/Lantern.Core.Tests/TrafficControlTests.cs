@@ -59,7 +59,7 @@ public sealed class TrafficControlTests
     }
 
     [Fact]
-    public void TrafficPolicy_OnlyActiveLimitsRequireArpInterception()
+    public void TrafficPolicy_AllObservedDevicesRequireTwoSidedInterception()
     {
         var policy = new TrafficPolicy();
         policy.SetRule("00:11:22:33:44:01", new TrafficRule(false, 0, 0));
@@ -67,20 +67,20 @@ public sealed class TrafficControlTests
         policy.SetRule("00:11:22:33:44:03", new TrafficRule(false, 0, 50));
         policy.SetRule("00:11:22:33:44:04", new TrafficRule(true, 0, 0));
 
-        Assert.False(policy.RequiresInterception("00:11:22:33:44:01"));
+        Assert.True(policy.RequiresInterception("00:11:22:33:44:01"));
         Assert.True(policy.RequiresInterception("00:11:22:33:44:02"));
         Assert.True(policy.RequiresInterception("00:11:22:33:44:03"));
         Assert.True(policy.RequiresInterception("00:11:22:33:44:04"));
-        Assert.False(policy.RequiresInterception("00:11:22:33:44:05"));
+        Assert.True(policy.RequiresInterception("00:11:22:33:44:05"));
     }
 
     [Theory]
-    [InlineData(false, 0, 0, InterceptionTargets.None)]
-    [InlineData(true, 0, 0, InterceptionTargets.Client)]
-    [InlineData(false, 0, 50, InterceptionTargets.Client)]
-    [InlineData(false, 100, 0, InterceptionTargets.Gateway)]
+    [InlineData(false, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    [InlineData(true, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    [InlineData(false, 0, 50, InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    [InlineData(false, 100, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
     [InlineData(false, 100, 50, InterceptionTargets.Client | InterceptionTargets.Gateway)]
-    public void TrafficPolicy_InterceptionTargetsAvoidUnneededArpSpoofing(
+    public void TrafficPolicy_ActiveRulesRedirectBothPeers(
         bool pause,
         int downloadLimit,
         int uploadLimit,
@@ -94,15 +94,15 @@ public sealed class TrafficControlTests
     }
 
     [Fact]
-    public void TrafficRule_ClientSafeModeDisablesRouterSideDownloadInterception()
+    public void TrafficRule_ForwardingModePreservesRequestedLimits()
     {
         var requested = new TrafficRule(false, 250, 75);
 
-        var safe = requested.ForClientSafeMode();
+        var forwardingRule = requested.ForForwardingMode();
 
-        Assert.Equal(0, safe.DownloadKiloBytesPerSecond);
-        Assert.Equal(75, safe.UploadKiloBytesPerSecond);
-        Assert.False(safe.PauseInternet);
+        Assert.Equal(250, forwardingRule.DownloadKiloBytesPerSecond);
+        Assert.Equal(75, forwardingRule.UploadKiloBytesPerSecond);
+        Assert.False(forwardingRule.PauseInternet);
     }
 
     [Fact]

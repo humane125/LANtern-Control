@@ -52,6 +52,23 @@ public sealed class NetworkingTests
     }
 
     [Fact]
+    public void BuildUnicastArpRequest_AddressesOnlyTheKnownDevice()
+    {
+        var bytes = EthernetFrameCodec.BuildUnicastArpRequest(
+            PhysicalAddress.Parse("345A6063C052"),
+            IPAddress.Parse("192.168.31.247"),
+            PhysicalAddress.Parse("0E4F69CCE4F0"),
+            IPAddress.Parse("192.168.31.213"));
+
+        var expected = Convert.FromHexString(
+            "0E4F69CCE4F0345A6063C0520806" +
+            "0001080006040001" +
+            "345A6063C052C0A81FF7" +
+            "0E4F69CCE4F0C0A81FD5");
+        Assert.Equal(expected, bytes);
+    }
+
+    [Fact]
     public void BuildArpReply_ProducesExactCorrectiveFrame()
     {
         var bytes = EthernetFrameCodec.BuildArpReply(

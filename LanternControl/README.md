@@ -10,11 +10,13 @@ router dashboard.
 - Discovers IPv4 devices from the Windows neighbor cache and normal LAN traffic.
 - Refreshes the passive device list every five seconds without sweeping or
   probing every address on the subnet.
-- Shows live download and upload rates for devices with an active control rule.
-- Applies upload limits in `KB/s` without modifying the router's ARP cache.
-- Pauses a device's IPv4 internet using target-side interception only.
+- Shows live download and upload rates for every redirected device.
+- Applies independent download and upload limits in `KB/s`.
+- Pauses a device's IPv4 internet in both directions.
 - Saves rules per MAC address.
 - Sends corrective ARP mappings when control stops or the window closes.
+- Uses separate ARP and packet-forwarding handles with a dedicated blocking
+  forwarding loop, matching the architecture validated with SelfishNet.
 
 It contains no Xiaomi or Tunisie Telecom login code. The Xiaomi
 `192.168.31.1` LAN can be used now; later, connect the PC directly to the
@@ -40,19 +42,20 @@ driver when launched as Administrator.
 6. Use **Pause internet** to stop a device's IPv4 internet.
 7. Click **Stop & restore** before changing networks or closing the program.
 
-No rule changes the router permanently. Starting the app does not reroute
-unlimited devices; a device is intercepted only while it has a nonzero limit or
-Pause enabled. Saved rules activate only when control is started.
+No rule changes the router permanently. While control is active, LANtern
+temporarily redirects known IPv4 clients through the controller PC so it can
+measure and shape both traffic directions. Saved rules activate only when
+control is started.
 
-Device discovery is passive to avoid packet loss on weak routers. Devices
-already present in the Windows neighbor cache appear immediately; others appear
-after they generate normal LAN traffic. **Refresh devices** rereads that cache
-and does not send a subnet scan.
+Device discovery combines the Windows neighbor cache with a paced ARP scan of
+the local `/24`. The scan runs every five seconds and spaces requests out so it
+does not create the burst that caused packet loss on weak routers. Larger
+networks are limited to the controller PC's local `/24`.
 
-Stable mode deliberately disables download limits. Exact download limiting
-requires redirecting traffic at the gateway, and testing showed that router-side
-ARP interception causes severe packet loss on the Xiaomi Mi Router 4A stock
-firmware. Pause and upload-only controls never poison the gateway in this mode.
+LANtern uses normal rather than promiscuous packet capture, separate handles for
+ARP and forwarded IP traffic, a one-millisecond blocking capture loop, and a
+five-second ARP maintenance interval. If the forwarding loop fails, it cancels
+control and restores normal ARP mappings automatically.
 
 ## Compatibility limits
 

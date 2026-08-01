@@ -1,10 +1,13 @@
 .worktrees/
+.superpowers/
 node_modules/
 dist/
 coverage/
 playwright-report/
 test-results/
 release/
+publish/
+publish-*/
 *.log
 **/bin/
 **/obj/

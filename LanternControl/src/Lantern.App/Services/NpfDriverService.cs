@@ -9,12 +9,6 @@ public static class NpfDriverService
 {
     public static async Task EnsureAvailableAsync(CancellationToken cancellationToken)
     {
-        if (!IsAdministrator())
-        {
-            throw new InvalidOperationException(
-                "Administrator access is required to capture and forward LAN packets.");
-        }
-
         if (!NativeLibrary.TryLoad("wpcap.dll", out var libraryHandle))
         {
             throw new InvalidOperationException(
@@ -27,6 +21,18 @@ public static class NpfDriverService
         {
             if (await IsServicePresentAsync(serviceName, cancellationToken))
             {
+                var query = await RunScAsync($"query {serviceName}", cancellationToken);
+                if (query.Output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                if (!IsAdministrator())
+                {
+                    throw new InvalidOperationException(
+                        $"Administrator access is required to start the {serviceName} packet capture driver.");
+                }
+
                 await StartServiceAsync(serviceName, cancellationToken);
                 return;
             }

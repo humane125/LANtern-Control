@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Net;
+using System.Net.Sockets;
 using Lantern.Core.Control;
 
 namespace Lantern.Core.Settings;
@@ -112,9 +114,16 @@ public sealed class SettingsStore
                     0,
                     pair.Value.UploadKiloBytesPerSecond),
                 PauseInternet = pair.Value.PauseInternet,
+                LastKnownIp = NormalizeIpv4(pair.Value.LastKnownIp),
             };
         }
 
         return normalized;
     }
+
+    private static string? NormalizeIpv4(string? value) =>
+        IPAddress.TryParse(value, out var address) &&
+        address.AddressFamily == AddressFamily.InterNetwork
+            ? address.ToString()
+            : null;
 }

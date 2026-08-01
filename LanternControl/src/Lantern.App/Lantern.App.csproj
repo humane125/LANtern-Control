@@ -6,9 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\RedWatcher.ico</ApplicationIcon>
     <AssemblyName>LANtern Control</AssemblyName>
     <RootNamespace>Lantern.App</RootNamespace>
-    <Version>0.1.5</Version>
+    <Version>0.3.3</Version>
     <Product>LANtern Control</Product>
     <Description>Router-independent IPv4 LAN bandwidth control for Windows.</Description>
     <Authors>LANtern Control</Authors>

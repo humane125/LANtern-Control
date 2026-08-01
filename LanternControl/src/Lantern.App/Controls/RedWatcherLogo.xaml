@@ -1,0 +1,50 @@
+<UserControl x:Class="Lantern.App.Controls.RedWatcherLogo"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent"
+             SnapsToDevicePixels="True">
+    <Viewbox Stretch="Uniform">
+        <Canvas Width="220" Height="180" Background="Transparent">
+            <Path Data="M25,91 C48,53 75,36 110,36 C145,36 172,53 195,91 C172,128 145,145 110,145 C75,145 48,128 25,91 Z"
+                  Fill="#050506"
+                  Stroke="{DynamicResource Accent}"
+                  StrokeThickness="7"
+                  StrokeLineJoin="Round" />
+            <Path Data="M34,91 C54,66 79,54 110,54 C141,54 166,66 186,91 C166,115 141,127 110,127 C79,127 54,115 34,91 Z"
+                  Fill="#0A0709"
+                  Stroke="#4F111B"
+                  StrokeThickness="2" />
+            <Ellipse Canvas.Left="71"
+                     Canvas.Top="52"
+                     Width="78"
+                     Height="78"
+                     Fill="#080608"
+                     Stroke="#6F101F"
+                     StrokeThickness="4" />
+            <Ellipse Canvas.Left="80"
+                     Canvas.Top="61"
+                     Width="60"
+                     Height="60">
+                <Ellipse.Fill>
+                    <RadialGradientBrush Center="0.5,0.48"
+                                         GradientOrigin="0.5,0.48"
+                                         RadiusX="0.64"
+                                         RadiusY="0.64">
+                        <GradientStop Offset="0" Color="#FF4357" />
+                        <GradientStop Offset="0.42" Color="#BD142D" />
+                        <GradientStop Offset="1" Color="#38050E" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+            <Ellipse x:Name="RedWatcherPupil"
+                     Canvas.Left="93"
+                     Canvas.Top="74"
+                     Width="34"
+                     Height="34"
+                     Fill="#020203" />
+            <Path Data="M29,91 H47 M173,91 H191"
+                  Stroke="#7E0E1E"
+                  StrokeThickness="3" />
+        </Canvas>
+    </Viewbox>
+</UserControl>

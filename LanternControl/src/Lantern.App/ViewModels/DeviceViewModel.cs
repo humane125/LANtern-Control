@@ -13,6 +13,8 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     private string displayName = "Unknown device";
     private string downloadRate = "0 B/s";
     private string uploadRate = "0 B/s";
+    private double downloadBytesPerSecond;
+    private double uploadBytesPerSecond;
     private double totalRate;
     private int downloadLimit;
     private int uploadLimit;
@@ -59,6 +61,18 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
         private set => SetField(ref uploadRate, value);
     }
 
+    public double DownloadBytesPerSecond
+    {
+        get => downloadBytesPerSecond;
+        private set => SetField(ref downloadBytesPerSecond, value);
+    }
+
+    public double UploadBytesPerSecond
+    {
+        get => uploadBytesPerSecond;
+        private set => SetField(ref uploadBytesPerSecond, value);
+    }
+
     public double TotalRate
     {
         get => totalRate;
@@ -72,6 +86,7 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
         {
             if (SetField(ref downloadLimit, Math.Max(0, value)))
             {
+                OnPropertyChanged(nameof(HasActiveRule));
                 _ = changed(this);
             }
         }
@@ -84,6 +99,7 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
         {
             if (SetField(ref uploadLimit, Math.Max(0, value)))
             {
+                OnPropertyChanged(nameof(HasActiveRule));
                 _ = changed(this);
             }
         }
@@ -96,6 +112,7 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
         {
             if (SetField(ref pauseInternet, value))
             {
+                OnPropertyChanged(nameof(HasActiveRule));
                 _ = changed(this);
             }
         }
@@ -109,11 +126,15 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
             if (SetField(ref isProtected, value))
             {
                 OnPropertyChanged(nameof(CanControl));
+                OnPropertyChanged(nameof(HasActiveRule));
             }
         }
     }
 
     public bool CanControl => !IsProtected;
+
+    public bool HasActiveRule =>
+        CanControl && (PauseInternet || DownloadLimit > 0 || UploadLimit > 0);
 
     public string ProtectedReason
     {
@@ -129,12 +150,13 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     {
         MacKey = snapshot.MacAddress.ToString();
         MacAddress = FormatMac(MacKey);
-        downloadLimit = 0;
+        downloadLimit = Math.Max(0, preferences?.DownloadKiloBytesPerSecond ?? 0);
         uploadLimit = Math.Max(0, preferences?.UploadKiloBytesPerSecond ?? 0);
         pauseInternet = !isProtectedDevice && (preferences?.PauseInternet ?? false);
         OnPropertyChanged(nameof(DownloadLimit));
         OnPropertyChanged(nameof(UploadLimit));
         OnPropertyChanged(nameof(PauseInternet));
+        OnPropertyChanged(nameof(HasActiveRule));
         IsProtected = isProtectedDevice;
         ProtectedReason = protectedDeviceReason;
         Update(snapshot, preferences?.Alias);
@@ -148,12 +170,14 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
             : !string.IsNullOrWhiteSpace(snapshot.HostName)
                 ? snapshot.HostName
                 : $"Device {IpAddress}";
+        DownloadBytesPerSecond = snapshot.DownloadBytesPerSecond;
+        UploadBytesPerSecond = snapshot.UploadBytesPerSecond;
         DownloadRate = FormatRate(snapshot.DownloadBytesPerSecond);
         UploadRate = FormatRate(snapshot.UploadBytesPerSecond);
         TotalRate = snapshot.TotalBytesPerSecond;
     }
 
-    private static string FormatRate(double bytesPerSecond)
+    public static string FormatRate(double bytesPerSecond)
     {
         return bytesPerSecond switch
         {

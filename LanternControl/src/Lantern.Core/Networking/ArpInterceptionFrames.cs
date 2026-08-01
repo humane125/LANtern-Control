@@ -23,8 +23,25 @@ public sealed record ArpPeerFrames(byte[] ToClient, byte[] ToGateway)
     }
 }
 
+public sealed record ArpControllerFrames(
+    byte[] ClientToController,
+    byte[] GatewayToController);
+
 public static class ArpInterceptionFrames
 {
+    public static byte[] BuildRecoveryRequest(
+        PhysicalAddress controllerMac,
+        PhysicalAddress gatewayMac,
+        IPAddress gatewayIp,
+        PhysicalAddress clientMac,
+        IPAddress clientIp) =>
+        EthernetFrameCodec.BuildArpRequestWithEthernetSource(
+            controllerMac,
+            gatewayMac,
+            gatewayIp,
+            clientMac,
+            clientIp);
+
     public static ArpPeerFrames BuildPoison(
         PhysicalAddress controllerMac,
         IPAddress gatewayIp,
@@ -43,20 +60,24 @@ public static class ArpInterceptionFrames
                 gatewayMac,
                 gatewayIp));
 
-    public static ArpPeerFrames BuildRestore(
+    public static ArpControllerFrames BuildControllerProtection(
+        PhysicalAddress controllerMac,
+        IPAddress controllerIp,
         PhysicalAddress gatewayMac,
         IPAddress gatewayIp,
         PhysicalAddress clientMac,
         IPAddress clientIp) =>
         new(
-            EthernetFrameCodec.BuildArpReply(
-                gatewayMac,
-                gatewayIp,
-                clientMac,
-                clientIp),
-            EthernetFrameCodec.BuildArpReply(
+            EthernetFrameCodec.BuildArpReplyWithEthernetSource(
+                controllerMac,
                 clientMac,
                 clientIp,
+                controllerMac,
+                controllerIp),
+            EthernetFrameCodec.BuildArpReplyWithEthernetSource(
                 gatewayMac,
-                gatewayIp));
+                gatewayMac,
+                gatewayIp,
+                controllerMac,
+                controllerIp));
 }

@@ -15,4 +15,6 @@ public sealed class DevicePreferences
     public int UploadKiloBytesPerSecond { get; set; }
 
     public bool PauseInternet { get; set; }
+
+    public string? LastKnownIp { get; set; }
 }

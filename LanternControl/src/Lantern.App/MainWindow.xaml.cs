@@ -2,9 +2,11 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Lantern.App.Services;
@@ -24,10 +26,13 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer refreshTimer;
     private readonly Dictionary<string, DeviceViewModel> deviceIndex =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly TrafficHistory trafficHistory = new(TrafficSamplingProfile.Capacity, TrafficSamplingProfile.Retention);
     private PcapLanEngine engine;
     private AppSettings settings = new();
+    private DateTimeOffset? controlStartedAt;
     private bool operationInProgress;
     private bool closeAfterStop;
+    private bool settingsDirty;
 
     public MainWindow()
     {
@@ -52,6 +57,7 @@ public partial class MainWindow : Window
         var adapters = WindowsAdapterService.GetUsableAdapters();
         AdapterSelector.ItemsSource = adapters;
         AdapterSelector.SelectedIndex = adapters.Count > 0 ? 0 : -1;
+        UpdateAdapterSummary();
         if (adapters.Count == 0)
         {
             SetStatus("No active IPv4 adapter with a gateway was found.", false);
@@ -72,7 +78,12 @@ public partial class MainWindow : Window
         try
         {
             ApplyAllSavedRules();
+            UpdateKnownDeviceHints();
             await engine.StartAsync(selected, CancellationToken.None);
+            controlStartedAt = DateTimeOffset.UtcNow;
+            TrafficChart.Samples = trafficHistory.Samples;
+            RefreshDevices(null, EventArgs.Empty);
+            await SaveSettingsIfDirtyAsync();
             SetStatus("Control active", true);
             refreshTimer.Start();
         }
@@ -108,9 +119,13 @@ public partial class MainWindow : Window
         UpdateButtons();
         try
         {
-            SetStatus("Refreshing Windows device cache…", null);
-            await engine.RefreshNeighborsAsync();
+            SetStatus("Sending a full /24 ARP sweep…", null);
+            UpdateKnownDeviceHints();
+            var result = await engine.RefreshNeighborsAsync();
+            RefreshDevices(null, EventArgs.Empty);
+            await SaveSettingsIfDirtyAsync();
             SetStatus("Control active", true);
+            DetailStatusText.Text = result.StatusMessage;
         }
         catch (Exception exception)
         {
@@ -125,6 +140,7 @@ public partial class MainWindow : Window
 
     private void AdapterSelector_OnSelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {
+        UpdateAdapterSummary();
         StartButton.IsEnabled = !operationInProgress &&
                                 !engine.IsRunning &&
                                 AdapterSelector.SelectedItem is AdapterProfile;
@@ -144,6 +160,10 @@ public partial class MainWindow : Window
         try
         {
             await engine.StopAsync();
+            RefreshDevices(null, EventArgs.Empty);
+            await SaveSettingsIfDirtyAsync();
+            controlStartedAt = null;
+            UptimeText.Text = "Idle";
             SetStatus("Stopped safely", null);
         }
         finally
@@ -158,10 +178,28 @@ public partial class MainWindow : Window
         var activeProfile = AdapterSelector.SelectedItem as AdapterProfile;
         foreach (var snapshot in registry.TakeSnapshot(DateTimeOffset.UtcNow))
         {
+            if (activeProfile is not null &&
+                (snapshot.IpAddress.Equals(activeProfile.LocalAddress) ||
+                 snapshot.MacAddress.Equals(activeProfile.LocalMac)))
+            {
+                continue;
+            }
+
             var key = snapshot.MacAddress.ToString();
             settings.Devices.TryGetValue(key, out var preferences);
             var isGateway = activeProfile is not null &&
                             snapshot.IpAddress.Equals(activeProfile.GatewayAddress);
+            if (!isGateway)
+            {
+                preferences ??= settings.Devices[key] = new DevicePreferences();
+                var currentIp = snapshot.IpAddress.ToString();
+                if (!string.Equals(preferences.LastKnownIp, currentIp, StringComparison.Ordinal))
+                {
+                    preferences.LastKnownIp = currentIp;
+                    settingsDirty = true;
+                }
+            }
+
             if (!deviceIndex.TryGetValue(key, out var viewModel))
             {
                 viewModel = new DeviceViewModel(OnDeviceRuleChangedAsync);
@@ -179,7 +217,12 @@ public partial class MainWindow : Window
             }
         }
 
-        CollectionViewSource.GetDefaultView(Devices).Refresh();
+        if (Keyboard.FocusedElement is not TextBox)
+        {
+            CollectionViewSource.GetDefaultView(Devices).Refresh();
+        }
+
+        RefreshDashboardSummary();
         EmptyState.Visibility = Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DeviceCountText.Text = $"{Devices.Count} device{(Devices.Count == 1 ? string.Empty : "s")}";
     }
@@ -194,24 +237,29 @@ public partial class MainWindow : Window
         var preferences = settings.Devices.TryGetValue(device.MacKey, out var existing)
             ? existing
             : settings.Devices[device.MacKey] = new DevicePreferences();
-        var safeRule = new TrafficRule(
+        var rule = new TrafficRule(
                 device.PauseInternet,
                 device.DownloadLimit,
                 device.UploadLimit)
-            .ForClientSafeMode();
-        preferences.DownloadKiloBytesPerSecond = safeRule.DownloadKiloBytesPerSecond;
-        preferences.UploadKiloBytesPerSecond = safeRule.UploadKiloBytesPerSecond;
-        preferences.PauseInternet = safeRule.PauseInternet;
+            .ForForwardingMode();
+        preferences.DownloadKiloBytesPerSecond = rule.DownloadKiloBytesPerSecond;
+        preferences.UploadKiloBytesPerSecond = rule.UploadKiloBytesPerSecond;
+        preferences.PauseInternet = rule.PauseInternet;
 
         try
         {
-            await engine.ApplyRuleAsync(device.MacKey, safeRule);
+            await engine.ApplyRuleAsync(device.MacKey, rule);
             await settingsStore.SaveAsync(settings);
+            settingsDirty = false;
             await Dispatcher.InvokeAsync(
-                () => DetailStatusText.Text =
-                    engine.IsRunning
-                        ? $"Rule applied to {device.DisplayName}."
-                        : $"Rule saved for {device.DisplayName}; it activates when control starts.");
+                () =>
+                {
+                    DetailStatusText.Text =
+                        engine.IsRunning
+                            ? $"Rule applied to {device.DisplayName}."
+                            : $"Rule saved for {device.DisplayName}; it activates when control starts.";
+                    RefreshDashboardSummary(addTrafficSample: false);
+                });
         }
         catch (Exception exception) when (
             exception is IOException or InvalidOperationException)
@@ -230,8 +278,40 @@ public partial class MainWindow : Window
                     pair.Value.PauseInternet,
                     pair.Value.DownloadKiloBytesPerSecond,
                     pair.Value.UploadKiloBytesPerSecond)
-                    .ForClientSafeMode());
+                    .ForForwardingMode());
         }
+    }
+
+    private void UpdateKnownDeviceHints()
+    {
+        var hints = new List<KnownDeviceHint>();
+        foreach (var pair in settings.Devices)
+        {
+            try
+            {
+                var mac = PhysicalAddress.Parse(pair.Key);
+                var lastKnownIp = IPAddress.TryParse(pair.Value.LastKnownIp, out var parsed)
+                    ? parsed
+                    : null;
+                hints.Add(new KnownDeviceHint(mac, lastKnownIp));
+            }
+            catch (FormatException)
+            {
+            }
+        }
+
+        engine.ReplaceKnownDeviceHints(hints);
+    }
+
+    private async Task SaveSettingsIfDirtyAsync()
+    {
+        if (!settingsDirty)
+        {
+            return;
+        }
+
+        await settingsStore.SaveAsync(settings);
+        settingsDirty = false;
     }
 
     private void Engine_OnStatusChanged(object? sender, string message)
@@ -268,6 +348,71 @@ public partial class MainWindow : Window
         StopButton.IsEnabled = !operationInProgress && engine.IsRunning;
         ScanButton.IsEnabled = !operationInProgress && engine.IsRunning;
         AdapterSelector.IsEnabled = !operationInProgress && !engine.IsRunning;
+        StartButton.Visibility = engine.IsRunning ? Visibility.Collapsed : Visibility.Visible;
+        ScanButton.Visibility = engine.IsRunning ? Visibility.Visible : Visibility.Collapsed;
+        StopButton.Visibility = engine.IsRunning ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void NavigationButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is not Button { Tag: string targetName } ||
+            FindName(targetName) is not FrameworkElement target)
+        {
+            return;
+        }
+
+        target.BringIntoView();
+        if (target == AdapterStrip)
+        {
+            AdapterSelector.Focus();
+        }
+    }
+
+    private void UpdateAdapterSummary()
+    {
+        if (AdapterSelector.SelectedItem is not AdapterProfile selected)
+        {
+            LocalIpText.Text = "-";
+            GatewayIpText.Text = "-";
+            return;
+        }
+
+        LocalIpText.Text = selected.LocalAddress.ToString();
+        GatewayIpText.Text = selected.GatewayAddress.ToString();
+    }
+
+    private void RefreshDashboardSummary(bool addTrafficSample = true)
+    {
+        var summary = DashboardSummary.From(Devices);
+        ConnectedDevicesMetric.Text = summary.ConnectedDevices.ToString();
+        DownloadMetric.Text = DeviceViewModel.FormatRate(summary.DownloadBytesPerSecond);
+        UploadMetric.Text = DeviceViewModel.FormatRate(summary.UploadBytesPerSecond);
+        ActiveRulesMetric.Text = summary.ActiveRules.ToString();
+
+        if (addTrafficSample && engine.IsRunning)
+        {
+            var sample = new TrafficSample(
+                DateTimeOffset.UtcNow,
+                summary.DownloadBytesPerSecond,
+                summary.UploadBytesPerSecond,
+                summary.TopDeviceName,
+                summary.TopDeviceDownloadBytesPerSecond,
+                summary.TopDeviceUploadBytesPerSecond);
+            if (trafficHistory.TryAdd(sample, TrafficSamplingProfile.Interval))
+            {
+                TrafficChart.Samples = trafficHistory.Samples;
+                ChartTopDeviceText.Text = string.IsNullOrWhiteSpace(sample.TopDevice)
+                    ? "No active device traffic"
+                    : $"{sample.TopDevice}  ↓ {DeviceViewModel.FormatRate(sample.TopDeviceDownloadBytesPerSecond)}  " +
+                      $"↑ {DeviceViewModel.FormatRate(sample.TopDeviceUploadBytesPerSecond)}";
+            }
+        }
+
+        if (controlStartedAt is { } startedAt)
+        {
+            var elapsed = DateTimeOffset.UtcNow - startedAt;
+            UptimeText.Text = $"Active {elapsed:hh\\:mm\\:ss}";
+        }
     }
 
     private void SetStatus(string message, bool? active)
@@ -282,9 +427,9 @@ public partial class MainWindow : Window
         StatusDot.Fill = new SolidColorBrush(
             active switch
             {
-                true => Color.FromRgb(73, 222, 129),
-                false => Color.FromRgb(255, 111, 125),
-                null => Color.FromRgb(152, 174, 194),
+                true => Color.FromRgb(104, 192, 138),
+                false => Color.FromRgb(240, 100, 115),
+                null => Color.FromRgb(168, 144, 149),
             });
     }
 }

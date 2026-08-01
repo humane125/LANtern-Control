@@ -21,6 +21,7 @@ public sealed class SettingsStoreTests
                         DownloadKiloBytesPerSecond = 500,
                         UploadKiloBytesPerSecond = 100,
                         PauseInternet = true,
+                        LastKnownIp = "192.168.31.213",
                     },
                 },
             };
@@ -34,6 +35,36 @@ public sealed class SettingsStoreTests
             Assert.Equal(500, saved.Value.DownloadKiloBytesPerSecond);
             Assert.Equal(100, saved.Value.UploadKiloBytesPerSecond);
             Assert.True(saved.Value.PauseInternet);
+            Assert.Equal("192.168.31.213", saved.Value.LastKnownIp);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SaveAndLoad_DropsInvalidLastKnownIp()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var store = new SettingsStore(directory);
+            var settings = new AppSettings
+            {
+                Devices =
+                {
+                    ["0E4F69CCE4F0"] = new DevicePreferences
+                    {
+                        LastKnownIp = "not-an-ip",
+                    },
+                },
+            };
+
+            await store.SaveAsync(settings);
+            var loaded = await store.LoadAsync();
+
+            Assert.Null(Assert.Single(loaded.Devices).Value.LastKnownIp);
         }
         finally
         {

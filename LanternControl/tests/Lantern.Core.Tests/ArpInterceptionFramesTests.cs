@@ -37,18 +37,23 @@ public sealed class ArpInterceptionFramesTests
     }
 
     [Fact]
-    public void BuildRestore_AdvertisesRealPeerMacs()
+    public void BuildRecoveryRequest_MakesTheClientRevalidateWithTheRealGateway()
     {
-        var frames = ArpInterceptionFrames.BuildRestore(
+        var frame = ArpInterceptionFrames.BuildRecoveryRequest(
+            LocalMac,
             GatewayMac,
             GatewayIp,
             ClientMac,
             ClientIp);
 
-        Assert.True(EthernetFrameCodec.TryParseArp(frames.ToClient, out var toClient));
-        Assert.Equal(GatewayMac, toClient.SenderMac);
-        Assert.True(EthernetFrameCodec.TryParseArp(frames.ToGateway, out var toGateway));
-        Assert.Equal(ClientMac, toGateway.SenderMac);
+        Assert.Equal(ClientMac.GetAddressBytes(), frame[..6]);
+        Assert.Equal(LocalMac.GetAddressBytes(), frame[6..12]);
+        Assert.True(EthernetFrameCodec.TryParseArp(frame, out var request));
+        Assert.Equal(ArpOperation.Request, request.Operation);
+        Assert.Equal(GatewayMac, request.SenderMac);
+        Assert.Equal(GatewayIp, request.SenderIp);
+        Assert.Equal(ClientMac, request.TargetMac);
+        Assert.Equal(ClientIp, request.TargetIp);
     }
 
     [Fact]
@@ -83,5 +88,55 @@ public sealed class ArpInterceptionFramesTests
         Assert.Equal(2, selected.Count);
         Assert.Equal(frames.ToClient, selected[0]);
         Assert.Equal(frames.ToGateway, selected[1]);
+    }
+
+    [Fact]
+    public void BuildControllerProtection_KeepsTheLocalGatewayMappingReal()
+    {
+        var controllerIp = IPAddress.Parse("192.168.31.247");
+
+        var frames = ArpInterceptionFrames.BuildControllerProtection(
+            LocalMac,
+            controllerIp,
+            GatewayMac,
+            GatewayIp,
+            ClientMac,
+            ClientIp);
+
+        Assert.Equal(LocalMac.GetAddressBytes(), frames.GatewayToController[..6]);
+        Assert.Equal(GatewayMac.GetAddressBytes(), frames.GatewayToController[6..12]);
+        Assert.True(
+            EthernetFrameCodec.TryParseArp(
+                frames.GatewayToController,
+                out var gatewayReply));
+        Assert.Equal(GatewayMac, gatewayReply.SenderMac);
+        Assert.Equal(GatewayIp, gatewayReply.SenderIp);
+        Assert.Equal(LocalMac, gatewayReply.TargetMac);
+        Assert.Equal(controllerIp, gatewayReply.TargetIp);
+    }
+
+    [Fact]
+    public void BuildControllerProtection_KeepsTheLocalClientMappingReal()
+    {
+        var controllerIp = IPAddress.Parse("192.168.31.247");
+
+        var frames = ArpInterceptionFrames.BuildControllerProtection(
+            LocalMac,
+            controllerIp,
+            GatewayMac,
+            GatewayIp,
+            ClientMac,
+            ClientIp);
+
+        Assert.Equal(LocalMac.GetAddressBytes(), frames.ClientToController[..6]);
+        Assert.Equal(LocalMac.GetAddressBytes(), frames.ClientToController[6..12]);
+        Assert.True(
+            EthernetFrameCodec.TryParseArp(
+                frames.ClientToController,
+                out var clientReply));
+        Assert.Equal(ClientMac, clientReply.SenderMac);
+        Assert.Equal(ClientIp, clientReply.SenderIp);
+        Assert.Equal(LocalMac, clientReply.TargetMac);
+        Assert.Equal(controllerIp, clientReply.TargetIp);
     }
 }

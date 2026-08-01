@@ -43,6 +43,35 @@ public static class EthernetFrameCodec
             new byte[6],
             targetIp.GetAddressBytes());
 
+    public static byte[] BuildUnicastArpRequest(
+        PhysicalAddress senderMac,
+        IPAddress senderIp,
+        PhysicalAddress targetMac,
+        IPAddress targetIp) =>
+        BuildArpFrame(
+            targetMac.GetAddressBytes(),
+            senderMac.GetAddressBytes(),
+            ArpOperation.Request,
+            senderMac.GetAddressBytes(),
+            senderIp.GetAddressBytes(),
+            targetMac.GetAddressBytes(),
+            targetIp.GetAddressBytes());
+
+    public static byte[] BuildArpRequestWithEthernetSource(
+        PhysicalAddress ethernetSource,
+        PhysicalAddress senderMac,
+        IPAddress senderIp,
+        PhysicalAddress targetMac,
+        IPAddress targetIp) =>
+        BuildArpFrame(
+            targetMac.GetAddressBytes(),
+            ethernetSource.GetAddressBytes(),
+            ArpOperation.Request,
+            senderMac.GetAddressBytes(),
+            senderIp.GetAddressBytes(),
+            targetMac.GetAddressBytes(),
+            targetIp.GetAddressBytes());
+
     public static byte[] BuildArpReply(
         PhysicalAddress senderMac,
         IPAddress senderIp,
@@ -51,6 +80,21 @@ public static class EthernetFrameCodec
         BuildArpFrame(
             targetMac.GetAddressBytes(),
             senderMac.GetAddressBytes(),
+            ArpOperation.Reply,
+            senderMac.GetAddressBytes(),
+            senderIp.GetAddressBytes(),
+            targetMac.GetAddressBytes(),
+            targetIp.GetAddressBytes());
+
+    public static byte[] BuildArpReplyWithEthernetSource(
+        PhysicalAddress ethernetSource,
+        PhysicalAddress senderMac,
+        IPAddress senderIp,
+        PhysicalAddress targetMac,
+        IPAddress targetIp) =>
+        BuildArpFrame(
+            targetMac.GetAddressBytes(),
+            ethernetSource.GetAddressBytes(),
             ArpOperation.Reply,
             senderMac.GetAddressBytes(),
             senderIp.GetAddressBytes(),

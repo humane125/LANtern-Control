@@ -1,260 +1,787 @@
 <Window x:Class="Lantern.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Lantern.App.Controls"
         Title="LANtern Control"
-        Width="1280"
-        Height="760"
-        MinWidth="1000"
-        MinHeight="620"
+        Width="1440"
+        Height="900"
+        MinWidth="1100"
+        MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBackground}"
         Foreground="{StaticResource PrimaryText}"
         TextOptions.TextFormattingMode="Display">
-    <Grid Margin="28">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <Window.Resources>
+        <StreamGeometry x:Key="IconOverview">M2,2 H8 V8 H2 Z M12,2 H18 V8 H12 Z M2,12 H8 V18 H2 Z M12,12 H18 V18 H12 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconActivity">M1,15 L5,11 L9,13 L14,5 L19,8</StreamGeometry>
+        <StreamGeometry x:Key="IconAdapter">M2,3 H18 V8 H2 Z M2,12 H18 V17 H2 Z M15,5 H16 M15,14 H16</StreamGeometry>
+        <StreamGeometry x:Key="IconDevice">M2,3 H18 V14 H2 Z M7,18 H13 M10,14 V18</StreamGeometry>
+        <StreamGeometry x:Key="IconDownload">M10,2 V14 M5,10 L10,15 L15,10 M3,18 H17</StreamGeometry>
+        <StreamGeometry x:Key="IconUpload">M10,18 V6 M5,10 L10,5 L15,10 M3,2 H17</StreamGeometry>
+        <StreamGeometry x:Key="IconRules">M3,5 H17 M3,10 H17 M3,15 H17</StreamGeometry>
+        <Style x:Key="CenteredGridTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="LimitEditorBorderStyle" TargetType="Border">
+            <Setter Property="Width" Value="128" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Background" Value="{StaticResource InputBackground}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.38" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CompactLimitTextBoxStyle" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="10,0,4,0" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CaretBrush" Value="{StaticResource PrimaryText}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Stretch" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="224" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <Border Width="38"
-                            Height="38"
-                            CornerRadius="10"
-                            Background="{StaticResource AccentDark}"
-                            BorderBrush="{StaticResource Accent}"
-                            BorderThickness="1">
-                        <Path Width="20"
-                              Height="20"
-                              Stretch="Uniform"
-                              Stroke="{StaticResource Accent}"
-                              StrokeThickness="1.8"
-                              Data="M2,14 L2,9 L6,9 L6,14 M8,14 L8,5 L12,5 L12,14 M14,14 L14,1 L18,1 L18,14 M1,16 L19,16" />
-                    </Border>
-                    <StackPanel Margin="12,0,0,0">
-                        <TextBlock Text="LANtern Control"
-                                   FontSize="24"
-                                   FontWeight="Bold" />
-                        <TextBlock Text="Router-independent LAN bandwidth control"
+        <Border x:Name="Sidebar"
+                Grid.Column="0"
+                Background="{StaticResource SidebarBackground}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="0,0,1,0">
+            <DockPanel Margin="18,24">
+                <Border DockPanel.Dock="Bottom"
+                        Margin="0,16,0,0"
+                        Padding="13"
+                        CornerRadius="10"
+                        Background="{StaticResource Surface}"
+                        BorderBrush="{StaticResource Border}"
+                        BorderThickness="1">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="7"
+                                     Height="7"
+                                     Margin="0,0,7,0"
+                                     Fill="{StaticResource Success}" />
+                            <TextBlock Text="LOCAL PROCESSING"
+                                       Foreground="{StaticResource SecondaryText}"
+                                       FontSize="10"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                        <TextBlock Margin="0,7,0,0"
+                                   Text="No router login required"
+                                   FontSize="11"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Margin="0,3,0,0"
+                                   Text="Traffic stays on this PC"
                                    Foreground="{StaticResource SecondaryText}"
-                                   FontSize="12" />
+                                   FontSize="10"
+                                   TextWrapping="Wrap" />
                     </StackPanel>
-                </StackPanel>
-            </StackPanel>
-            <Border Grid.Column="1"
-                    Padding="12,8"
-                    CornerRadius="16"
-                    Background="{StaticResource SurfaceRaised}"
-                    BorderBrush="{StaticResource Border}"
-                    BorderThickness="1">
-                <StackPanel Orientation="Horizontal">
-                    <Ellipse x:Name="StatusDot"
-                             Width="9"
-                             Height="9"
-                             Margin="0,0,8,0"
-                             Fill="{StaticResource SecondaryText}" />
-                    <TextBlock x:Name="TopStatusText"
-                               Text="Idle"
-                               VerticalAlignment="Center"
-                               FontWeight="SemiBold" />
-                </StackPanel>
-            </Border>
-        </Grid>
+                </Border>
 
-        <Border Grid.Row="1"
-                Margin="0,24,0,16"
-                Padding="18"
-                CornerRadius="12"
-                Background="{StaticResource Surface}"
-                BorderBrush="{StaticResource Border}"
-                BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="NETWORK ADAPTER"
+                <StackPanel DockPanel.Dock="Top">
+                    <StackPanel Margin="2,0,0,34" Orientation="Horizontal">
+                        <Border Width="42"
+                                Height="42"
+                                CornerRadius="11"
+                                Background="{StaticResource AccentDark}"
+                                BorderBrush="{StaticResource Accent}"
+                                BorderThickness="1">
+                            <controls:RedWatcherLogo x:Name="BrandLogo"
+                                                     Width="32"
+                                                     Height="32"
+                                                     AutomationProperties.Name="LANtern Control Red Watcher logo" />
+                        </Border>
+                        <StackPanel Margin="11,1,0,0">
+                            <TextBlock Text="LANtern"
+                                       FontSize="20"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="CONTROL"
+                                       Foreground="{StaticResource Accent}"
+                                       FontSize="10"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Margin="14,0,0,10"
+                               Text="WORKSPACE"
                                Foreground="{StaticResource SecondaryText}"
-                               FontSize="11"
+                               FontSize="10"
                                FontWeight="SemiBold" />
-                    <ComboBox x:Name="AdapterSelector"
-                              Margin="0,7,18,0"
-                              MinWidth="520"
-                              SelectionChanged="AdapterSelector_OnSelectionChanged">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name}"
-                                               Foreground="#111827"
-                                               FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding Summary}"
-                                               Foreground="#526274"
-                                               FontSize="11" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
+                    <Button x:Name="OverviewNavButton"
+                            Style="{StaticResource NavButtonStyle}"
+                            Tag="OverviewSection"
+                            Click="NavigationButton_OnClick">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="25" Height="20">
+                                <Path Width="16"
+                                      Height="16"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Data="{StaticResource IconOverview}"
+                                      Fill="{StaticResource Accent}"
+                                      Stretch="Uniform" />
+                            </Grid>
+                            <TextBlock Text="Overview" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ActivityNavButton"
+                            Style="{StaticResource NavButtonStyle}"
+                            Tag="ActivitySection"
+                            Click="NavigationButton_OnClick">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="25" Height="20">
+                                <Path Width="17"
+                                      Height="17"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Data="{StaticResource IconActivity}"
+                                      Stroke="{StaticResource SecondaryText}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Stretch="Uniform" />
+                            </Grid>
+                            <TextBlock Text="Activity" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="AdapterNavButton"
+                            Style="{StaticResource NavButtonStyle}"
+                            Tag="AdapterStrip"
+                            Click="NavigationButton_OnClick">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="25" Height="20">
+                                <Path Width="17"
+                                      Height="17"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Data="{StaticResource IconAdapter}"
+                                      Stroke="{StaticResource SecondaryText}"
+                                      StrokeThickness="1.6"
+                                      StrokeLineJoin="Round"
+                                      Stretch="Uniform" />
+                            </Grid>
+                            <TextBlock Text="Adapter" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
-                <StackPanel Grid.Column="1"
-                            VerticalAlignment="Bottom"
-                            Orientation="Horizontal">
-                    <Button x:Name="StartButton"
-                            Click="StartButton_OnClick"
-                            Background="{StaticResource AccentDark}"
-                            BorderBrush="{StaticResource Accent}"
-                            Content="Start control" />
-                    <Button x:Name="ScanButton"
-                            Click="ScanButton_OnClick"
-                            IsEnabled="False"
-                            Content="Refresh devices" />
-                    <Button x:Name="StopButton"
-                            Click="StopButton_OnClick"
-                            IsEnabled="False"
-                            BorderBrush="#6A3440"
-                            Content="Stop &amp; restore" />
-                </StackPanel>
-            </Grid>
+            </DockPanel>
         </Border>
 
-        <Border Grid.Row="2"
-                Margin="0,0,0,16"
-                Padding="12,10"
-                CornerRadius="8"
-                Background="#102338"
-                BorderBrush="{StaticResource Border}"
-                BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Path Width="18"
-                      Height="18"
-                      Margin="2,0,10,0"
-                      VerticalAlignment="Center"
-                      Stretch="Uniform"
-                      Stroke="{StaticResource Accent}"
-                      StrokeThickness="1.8"
-                      Data="M8,1 A7,7 0 1 0 8,15 A7,7 0 1 0 8,1 M8,5 L8,9 M8,12 L8,12.2" />
-                <TextBlock Grid.Column="1"
-                           Text="Stable mode: Pause and upload limits intercept only the target device. Router-side download limits are disabled to prevent network-wide lag."
-                           Foreground="#B9CBDC"
-                           VerticalAlignment="Center" />
-            </Grid>
-        </Border>
+        <ScrollViewer x:Name="MainScrollViewer"
+                      Grid.Column="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="30,26,30,20">
+                <Grid x:Name="OverviewSection">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="NETWORK CONTROL"
+                                   Foreground="{StaticResource Accent}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Margin="0,3,0,0"
+                                   Text="Network overview"
+                                   FontSize="27"
+                                   FontWeight="Bold" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Text="Monitor and control devices on your local network"
+                                   Foreground="{StaticResource SecondaryText}"
+                                   FontSize="13" />
+                    </StackPanel>
+                    <Border x:Name="TopStatusBadge"
+                            Grid.Column="1"
+                            Padding="14,9"
+                            VerticalAlignment="Top"
+                            CornerRadius="18"
+                            Background="{StaticResource SurfaceRaised}"
+                            BorderBrush="{StaticResource Border}"
+                            BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="StatusDot"
+                                     Width="9"
+                                     Height="9"
+                                     Margin="0,0,8,0"
+                                     Fill="{StaticResource SecondaryText}" />
+                            <TextBlock x:Name="TopStatusText"
+                                       Text="Idle"
+                                       VerticalAlignment="Center"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
 
-        <Border Grid.Row="3"
-                CornerRadius="12"
-                Background="{StaticResource Surface}"
-                BorderBrush="{StaticResource Border}"
-                BorderThickness="1"
-                ClipToBounds="True">
-            <Grid>
-                <DataGrid x:Name="DeviceGrid"
-                          ItemsSource="{Binding Devices}"
-                          AutoGenerateColumns="False"
-                          AlternationCount="2"
-                          IsReadOnly="False">
-                    <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="DEVICE" Width="2*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding DisplayName}"
-                                                   FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding ProtectedReason}"
-                                                   Foreground="{StaticResource SecondaryText}"
-                                                   FontSize="11" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="IP ADDRESS"
-                                            Width="1.1*"
-                                            IsReadOnly="True"
-                                            Binding="{Binding IpAddress}" />
-                        <DataGridTextColumn Header="MAC ADDRESS"
-                                            Width="1.35*"
-                                            IsReadOnly="True"
-                                            Binding="{Binding MacAddress}" />
-                        <DataGridTextColumn Header="DOWNLOAD"
-                                            Width="1*"
-                                            IsReadOnly="True"
-                                            Binding="{Binding DownloadRate}" />
-                        <DataGridTextColumn Header="UPLOAD"
-                                            Width="1*"
-                                            IsReadOnly="True"
-                                            Binding="{Binding UploadRate}" />
-                        <DataGridTemplateColumn Header="DOWN LIMIT" Width="1.2*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBox Width="92"
-                                             HorizontalAlignment="Left"
-                                             IsEnabled="False"
-                                             ToolTip="Disabled in stable mode because it requires router-side ARP interception"
-                                             Text="{Binding DownloadLimit, UpdateSourceTrigger=LostFocus}" />
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="UP LIMIT (KB/s)" Width="1.2*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBox Width="92"
-                                             HorizontalAlignment="Left"
-                                             IsEnabled="{Binding CanControl}"
-                                             ToolTip="0 means unlimited"
-                                             Text="{Binding UploadLimit, UpdateSourceTrigger=LostFocus}" />
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="PAUSE INTERNET" Width="1.05*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <CheckBox HorizontalAlignment="Center"
-                                              IsEnabled="{Binding CanControl}"
-                                              IsChecked="{Binding PauseInternet, UpdateSourceTrigger=PropertyChanged}"
-                                              ToolTip="Drop this device's IPv4 internet traffic while control is active" />
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
+                <Border x:Name="AdapterStrip"
+                        Margin="0,24,0,18"
+                        Padding="22"
+                        Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.8*" MinWidth="280" />
+                            <ColumnDefinition Width="1*" MinWidth="210" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="NETWORK ADAPTER"
+                                       Foreground="{StaticResource SecondaryText}"
+                                       FontSize="10"
+                                       FontWeight="SemiBold" />
+                            <ComboBox x:Name="AdapterSelector"
+                                      Margin="0,8,22,0"
+                                      MinWidth="250"
+                                      SelectionChanged="AdapterSelector_OnSelectionChanged">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{StaticResource PrimaryText}"
+                                                       FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Summary}"
+                                                       Foreground="{StaticResource SecondaryText}"
+                                                       FontSize="11" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
 
-                <StackPanel x:Name="EmptyState"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="No devices observed yet"
-                               HorizontalAlignment="Center"
-                               FontSize="18"
-                               FontWeight="SemiBold" />
-                    <TextBlock Margin="0,6,0,0"
-                               Text="Choose an adapter and start control to observe this LAN."
-                               Foreground="{StaticResource SecondaryText}" />
-                </StackPanel>
-            </Grid>
-        </Border>
+                        <Grid Grid.Column="1" Margin="8,0,18,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="LOCAL IP"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock x:Name="LocalIpText"
+                                           Margin="0,6,0,0"
+                                           Text="-"
+                                           FontSize="13"
+                                           FontWeight="SemiBold" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="GATEWAY"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock x:Name="GatewayIpText"
+                                           Margin="0,6,0,0"
+                                           Text="-"
+                                           FontSize="13"
+                                           FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Grid>
 
-        <Grid Grid.Row="4" Margin="0,12,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock x:Name="DetailStatusText"
-                       Text="Ready. No router login is required."
-                       Foreground="{StaticResource SecondaryText}" />
-            <TextBlock x:Name="DeviceCountText"
-                       Grid.Column="1"
-                       Text="0 devices"
-                       Foreground="{StaticResource SecondaryText}" />
-        </Grid>
+                        <StackPanel Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <Button x:Name="StartButton"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="StartButton_OnClick"
+                                    Content="Start control" />
+                            <Button x:Name="ScanButton"
+                                    Click="ScanButton_OnClick"
+                                    IsEnabled="False"
+                                    Visibility="Collapsed"
+                                    Content="Refresh devices" />
+                            <Button x:Name="StopButton"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Click="StopButton_OnClick"
+                                    IsEnabled="False"
+                                    Visibility="Collapsed"
+                                    Content="Stop &amp; restore" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <controls:ResponsiveUniformGrid x:Name="MetricsPanel"
+                                                Breakpoint="900"
+                                                WideColumns="4"
+                                                Rows="0">
+                    <Border Style="{StaticResource MetricCardStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="CONNECTED DEVICES"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock x:Name="ConnectedDevicesMetric"
+                                           Margin="0,8,0,2"
+                                           Text="0"
+                                           FontSize="25"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="active clients"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    Width="38"
+                                    Height="38"
+                                    CornerRadius="10"
+                                    Background="{StaticResource AccentDark}">
+                                <Path Width="19"
+                                      Height="19"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Data="{StaticResource IconDevice}"
+                                      Stroke="{StaticResource Accent}"
+                                      StrokeThickness="1.7"
+                                      StrokeLineJoin="Round"
+                                      Stretch="Uniform" />
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource MetricCardStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="DOWNLOAD"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock x:Name="DownloadMetric"
+                                           Margin="0,8,0,2"
+                                           Text="0 B/s"
+                                           FontSize="25"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="current total"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                            </StackPanel>
+                            <Path Grid.Column="1"
+                                  Width="20"
+                                  Height="20"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource IconDownload}"
+                                  Stroke="{StaticResource DownloadAccent}"
+                                  StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  Stretch="Uniform" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource MetricCardStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="UPLOAD"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock x:Name="UploadMetric"
+                                           Margin="0,8,0,2"
+                                           Text="0 B/s"
+                                           FontSize="25"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="current total"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                            </StackPanel>
+                            <Path Grid.Column="1"
+                                  Width="20"
+                                  Height="20"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource IconUpload}"
+                                  Stroke="{StaticResource UploadAccent}"
+                                  StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  Stretch="Uniform" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource MetricCardStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="ACTIVE LIMITS"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock x:Name="ActiveRulesMetric"
+                                           Margin="0,8,0,2"
+                                           Text="0"
+                                           FontSize="25"
+                                           FontWeight="Bold" />
+                                <TextBlock Text="device rules"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    Width="38"
+                                    Height="38"
+                                    CornerRadius="10"
+                                    Background="{StaticResource AccentDark}">
+                                <Path Width="19"
+                                      Height="19"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Data="{StaticResource IconRules}"
+                                      Stroke="{StaticResource UploadAccent}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Stretch="Uniform" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </controls:ResponsiveUniformGrid>
+
+                <Border x:Name="ActivitySection"
+                        Margin="0,6,12,18"
+                        Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="20,18,20,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="LIVE THROUGHPUT"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="Network activity"
+                                           FontSize="18"
+                                           FontWeight="Bold" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" Fill="{StaticResource DownloadAccent}" />
+                                <TextBlock Margin="6,0,16,0"
+                                           Text="Download"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                                <Ellipse Width="7" Height="7" Fill="{StaticResource UploadAccent}" />
+                                <TextBlock Margin="6,0,16,0"
+                                           Text="Upload"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                                <Ellipse Width="7" Height="7" Fill="{StaticResource Success}" />
+                                <TextBlock Margin="6,0,0,0"
+                                           Text="1 sec live"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                            </StackPanel>
+                        </Grid>
+                        <Separator Grid.Row="1" Background="{StaticResource Border}" />
+                        <controls:LiveTrafficChart x:Name="TrafficChart"
+                                                   Grid.Row="2"
+                                                   Height="238"
+                                                   Margin="20,10,20,14" />
+                        <Border Grid.Row="3"
+                                Padding="20,12"
+                                Background="{StaticResource InputBackground}"
+                                BorderBrush="{StaticResource Border}"
+                                BorderThickness="0,1,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="ChartRangeText"
+                                           Text="Last 1 hour  •  1 second samples"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="11" />
+                                <TextBlock x:Name="ChartTopDeviceText"
+                                           Grid.Column="1"
+                                           Margin="20,0,0,0"
+                                           HorizontalAlignment="Right"
+                                           Text="Waiting for device traffic"
+                                           Foreground="{StaticResource PrimaryText}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border x:Name="DeviceSection"
+                        Margin="0,0,12,0"
+                        Style="{StaticResource CardBorderStyle}"
+                        ClipToBounds="True">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="20,18,20,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="NETWORK CLIENTS"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="Connected devices"
+                                           FontSize="18"
+                                           FontWeight="Bold" />
+                            </StackPanel>
+                            <TextBlock x:Name="DeviceCountText"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       Text="0 devices"
+                                       Foreground="{StaticResource SecondaryText}" />
+                        </Grid>
+                        <Separator Grid.Row="1" Background="{StaticResource Border}" />
+
+                        <Grid Grid.Row="2">
+                            <DataGrid x:Name="DeviceGrid"
+                                      MinHeight="270"
+                                      MaxHeight="430"
+                                      ItemsSource="{Binding Devices}"
+                                      AutoGenerateColumns="False"
+                                      AlternationCount="2"
+                                      CanUserSortColumns="False"
+                                      IsReadOnly="False">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="DEVICE" Width="2.2*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="36" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Width="30"
+                                                            Height="30"
+                                                            HorizontalAlignment="Left"
+                                                            CornerRadius="8"
+                                                            Background="{StaticResource AccentDark}">
+                                                        <Path Width="16"
+                                                              Height="16"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Data="{StaticResource IconDevice}"
+                                                              Stroke="{StaticResource Accent}"
+                                                              StrokeThickness="1.7"
+                                                              StrokeLineJoin="Round"
+                                                              Stretch="Uniform" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding DisplayName}"
+                                                                   FontWeight="SemiBold" />
+                                                        <StackPanel Margin="0,2,0,0" Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding MacAddress}"
+                                                                       Foreground="{StaticResource SecondaryText}"
+                                                                       FontSize="10" />
+                                                            <TextBlock Margin="8,0,0,0"
+                                                                       Text="{Binding ProtectedReason}"
+                                                                       Foreground="{StaticResource Accent}"
+                                                                       FontSize="10" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="IP ADDRESS"
+                                                        Width="1.05*"
+                                                        IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CenteredGridTextStyle}"
+                                                        Binding="{Binding IpAddress}" />
+                                    <DataGridTextColumn Header="DOWNLOAD"
+                                                        Width="1*"
+                                                        IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CenteredGridTextStyle}"
+                                                        Binding="{Binding DownloadRate}" />
+                                    <DataGridTextColumn Header="UPLOAD"
+                                                        Width="1*"
+                                                        IsReadOnly="True"
+                                                        ElementStyle="{StaticResource CenteredGridTextStyle}"
+                                                        Binding="{Binding UploadRate}" />
+                                    <DataGridTemplateColumn Header="DOWN LIMIT" Width="1.35*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="14,0,8,0"
+                                                        VerticalAlignment="Center"
+                                                        IsEnabled="{Binding CanControl}"
+                                                        Style="{StaticResource LimitEditorBorderStyle}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="1" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox x:Name="LimitEditor"
+                                                                 Style="{StaticResource CompactLimitTextBoxStyle}"
+                                                                 ToolTip="0 means unlimited"
+                                                                 Text="{Binding DownloadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}" />
+                                                        <Border Grid.Column="1"
+                                                                Margin="0,7"
+                                                                Background="{StaticResource Border}" />
+                                                        <TextBlock Grid.Column="2"
+                                                                   Margin="7,0,8,0"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="KB/s"
+                                                                   Foreground="{StaticResource SecondaryText}"
+                                                                   FontSize="10" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="UP LIMIT" Width="1.35*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="14,0,8,0"
+                                                        VerticalAlignment="Center"
+                                                        IsEnabled="{Binding CanControl}"
+                                                        Style="{StaticResource LimitEditorBorderStyle}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="1" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox x:Name="LimitEditor"
+                                                                 Style="{StaticResource CompactLimitTextBoxStyle}"
+                                                                 ToolTip="0 means unlimited"
+                                                                 Text="{Binding UploadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}" />
+                                                        <Border Grid.Column="1"
+                                                                Margin="0,7"
+                                                                Background="{StaticResource Border}" />
+                                                        <TextBlock Grid.Column="2"
+                                                                   Margin="7,0,8,0"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="KB/s"
+                                                                   Foreground="{StaticResource SecondaryText}"
+                                                                   FontSize="10" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="INTERNET" Width="1.3*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Margin="14,0,0,0"
+                                                          HorizontalAlignment="Left"
+                                                          VerticalAlignment="Center"
+                                                          Style="{StaticResource SwitchCheckBoxStyle}"
+                                                          Content="Paused"
+                                                          IsEnabled="{Binding CanControl}"
+                                                          IsChecked="{Binding PauseInternet, UpdateSourceTrigger=PropertyChanged}"
+                                                          ToolTip="Pause this device while control is active" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <StackPanel x:Name="EmptyState"
+                                        Margin="0,70,0,70"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <Border Width="46"
+                                        Height="46"
+                                        HorizontalAlignment="Center"
+                                        CornerRadius="13"
+                                        Background="{StaticResource SurfaceRaised}">
+                                    <Path Width="22"
+                                          Height="22"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Data="{StaticResource IconDevice}"
+                                          Stroke="{StaticResource Accent}"
+                                          StrokeThickness="1.6"
+                                          StrokeLineJoin="Round"
+                                          Stretch="Uniform" />
+                                </Border>
+                                <TextBlock Margin="0,12,0,0"
+                                           Text="No devices observed yet"
+                                           HorizontalAlignment="Center"
+                                           FontSize="16"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Margin="0,5,0,0"
+                                           Text="Choose an adapter and start control to observe this LAN."
+                                           Foreground="{StaticResource SecondaryText}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Row="3"
+                                Padding="16,12"
+                                Background="{StaticResource InputBackground}"
+                                BorderBrush="{StaticResource Border}"
+                                BorderThickness="0,1,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="DetailStatusText"
+                                           Text="Ready. No router login is required."
+                                           Foreground="{StaticResource SecondaryText}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock x:Name="UptimeText"
+                                           Grid.Column="1"
+                                           Margin="16,0,0,0"
+                                           Text="Idle"
+                                           Foreground="{StaticResource SecondaryText}" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Window>

@@ -18,6 +18,6 @@ public sealed record TrafficRule(
             UploadKiloBytesPerSecond = Math.Max(0, UploadKiloBytesPerSecond),
         };
 
-    public TrafficRule ForClientSafeMode() =>
-        Normalize() with { DownloadKiloBytesPerSecond = 0 };
+    public TrafficRule ForForwardingMode() =>
+        Normalize();
 }
