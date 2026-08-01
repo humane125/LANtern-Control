@@ -2,6 +2,14 @@
   <img src="assets/lantern-control-social-preview.png" alt="LANtern Control — local network visibility and control" width="100%">
 </p>
 
+<p align="center">
+  <a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.0" src="https://img.shields.io/badge/release-v0.1.0-C51B3A?style=flat-square"></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-C51B3A?style=flat-square"></a>
+  <img alt="C#" src="https://img.shields.io/badge/language-C%23-239120?style=flat-square&amp;logo=csharp">
+  <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&amp;logo=dotnet">
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&amp;logo=windows11">
+</p>
+
 # LANtern Control
 
 LANtern Control is a router-independent Windows application for discovering,
@@ -151,6 +159,10 @@ dotnet test .\tests\Lantern.App.Tests\Lantern.App.Tests.csproj
 
 The publishing script creates the portable application and installer in the
 `outputs` folder.
+
+## License
+
+LANtern Control is open-source software released under the [MIT License](LICENSE).
 
 ## Responsible use
 
