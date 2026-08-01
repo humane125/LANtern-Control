@@ -2,7 +2,7 @@
   <img src="assets/lantern-control-social-preview.png" alt="LANtern Control — local network visibility and control" width="100%">
 </p>
 
-# LANtern Control
+# LANtern Control — Open-Source SelfishNet Alternative for Windows
 
 <a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.1" src="https://img.shields.io/badge/release-v0.1.1-C51B3A?style=flat-square"></a>
 <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-C51B3A?style=flat-square"></a>
@@ -10,10 +10,15 @@
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&amp;logo=dotnet">
 <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&amp;logo=windows11">
 
-LANtern Control is a router-independent Windows application for discovering,
-monitoring, and managing devices on a local IPv4 network. It provides
-SelfishNet-style bandwidth controls through a modern desktop interface without
-requiring access to the router's administration dashboard.
+LANtern Control is an open-source SelfishNet alternative for Windows: a
+router-independent desktop application for discovering, monitoring, and
+controlling devices on a local IPv4 network. It combines live per-device
+bandwidth monitoring, download and upload limits, internet pause controls, and
+domain rules without requiring access to the router's administration dashboard.
+
+If you are looking for a maintained SelfishNet, EvilLimiter, or NetCut
+alternative with a modern Windows interface, LANtern Control is built for that
+use case.
 
 > [!IMPORTANT]
 > LANtern Control is currently available for Windows. **Linux and macOS are
