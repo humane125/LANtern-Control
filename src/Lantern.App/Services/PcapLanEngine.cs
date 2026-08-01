@@ -174,6 +174,12 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private async Task<DiscoveryRefreshResult> RefreshNeighborsCoreAsync(
         CancellationToken cancellationToken)
     {
+        foreach (var device in registry.Peek()
+                     .Where(device => string.IsNullOrWhiteSpace(device.HostName)))
+        {
+            resolvingNames.TryRemove(device.MacAddress.ToString(), out _);
+        }
+
         var clients = clientMappings.Mappings;
         var activeProfile = profile ??
             throw new InvalidOperationException("Select and start an adapter before refreshing.");
@@ -498,6 +504,11 @@ public sealed class PcapLanEngine : IAsyncDisposable
             return;
         }
 
+        if (DhcpHostNameParser.TryParse(bytes, out var dhcpHost))
+        {
+            registry.SetHostName(dhcpHost.MacAddress, dhcpHost.HostName);
+        }
+
         var result = frameRouter.Route(bytes);
         if (result.Direction is not null && result.ClientMac is not null)
         {
@@ -568,7 +579,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
         var dnsTask = ResolveDnsNameAsync(address);
         var netBiosTask = NetBiosNameResolver.ResolveAsync(address);
-        var pending = new List<Task<string?>> { dnsTask, netBiosTask };
+        var mdnsTask = MdnsNameResolver.ResolveAsync(address);
+        var pending = new List<Task<string?>> { dnsTask, netBiosTask, mdnsTask };
         while (pending.Count > 0)
         {
             var completed = await Task.WhenAny(pending);
