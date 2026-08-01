@@ -21,7 +21,8 @@ public readonly record struct Ipv4FrameInfo(
     PhysicalAddress SourceMac,
     PhysicalAddress DestinationMac,
     IPAddress Source,
-    IPAddress Destination);
+    IPAddress Destination,
+    int TransportPayloadLength);
 
 public static class EthernetFrameCodec
 {
@@ -147,18 +148,59 @@ public static class EthernetFrameCodec
         }
 
         var headerLength = (frame[payloadOffset] & 0x0f) * 4;
+        var totalLength = ReadUInt16(frame, payloadOffset + 2);
         if (headerLength < 20 || frame.Length < payloadOffset + headerLength)
         {
             return false;
         }
+
+        var availableNetworkLength = frame.Length - payloadOffset;
+        var networkLength = totalLength >= headerLength
+            ? Math.Min(totalLength, availableNetworkLength)
+            : availableNetworkLength;
 
         result = new Ipv4FrameInfo(
             payloadOffset,
             new PhysicalAddress(frame.Slice(6, 6).ToArray()),
             new PhysicalAddress(frame[..6].ToArray()),
             new IPAddress(frame.Slice(payloadOffset + 12, 4)),
-            new IPAddress(frame.Slice(payloadOffset + 16, 4)));
+            new IPAddress(frame.Slice(payloadOffset + 16, 4)),
+            GetTransportPayloadLength(frame, payloadOffset, headerLength, networkLength));
         return true;
+    }
+
+    private static int GetTransportPayloadLength(
+        ReadOnlySpan<byte> frame,
+        int ipv4Offset,
+        int ipv4HeaderLength,
+        int networkLength)
+    {
+        var ipv4PayloadLength = networkLength - ipv4HeaderLength;
+        var fragmentOffset = ReadUInt16(frame, ipv4Offset + 6) & 0x1fff;
+        if (fragmentOffset != 0)
+        {
+            return ipv4PayloadLength;
+        }
+
+        var transportOffset = ipv4Offset + ipv4HeaderLength;
+        return frame[ipv4Offset + 9] switch
+        {
+            6 when ipv4PayloadLength >= 20 =>
+                SubtractTcpHeader(frame, transportOffset, ipv4PayloadLength),
+            17 when ipv4PayloadLength >= 8 => ipv4PayloadLength - 8,
+            _ => ipv4PayloadLength,
+        };
+    }
+
+    private static int SubtractTcpHeader(
+        ReadOnlySpan<byte> frame,
+        int transportOffset,
+        int ipv4PayloadLength)
+    {
+        var tcpHeaderLength = (frame[transportOffset + 12] >> 4) * 4;
+        return tcpHeaderLength is >= 20 && tcpHeaderLength <= ipv4PayloadLength
+            ? ipv4PayloadLength - tcpHeaderLength
+            : ipv4PayloadLength;
     }
 
     public static byte[] RewriteEthernetAddresses(

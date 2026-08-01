@@ -53,6 +53,23 @@ public sealed class FrameRouterTests
     }
 
     [Fact]
+    public void Route_DownloadMetersTcpPayloadWithoutNetworkHeaders()
+    {
+        var frame = BuildTcpIpv4Frame(
+            destinationMac: LocalMac,
+            sourceMac: GatewayMac,
+            sourceIp: IPAddress.Parse("1.1.1.1"),
+            destinationIp: ClientIp,
+            applicationPayloadBytes: 100);
+        var router = CreateRouter();
+
+        var result = router.Route(frame);
+
+        Assert.Equal(FrameAction.Forward, result.Action);
+        Assert.Equal(100, result.MeteredByteCount);
+    }
+
+    [Fact]
     public void Route_PausedClientDropsFrame()
     {
         var policy = new TrafficPolicy();
@@ -115,6 +132,25 @@ public sealed class FrameRouterTests
         frame[23] = 6;
         sourceIp.GetAddressBytes().CopyTo(frame, 26);
         destinationIp.GetAddressBytes().CopyTo(frame, 30);
+        return frame;
+    }
+
+    private static byte[] BuildTcpIpv4Frame(
+        PhysicalAddress destinationMac,
+        PhysicalAddress sourceMac,
+        IPAddress sourceIp,
+        IPAddress destinationIp,
+        int applicationPayloadBytes)
+    {
+        const int ipv4HeaderBytes = 20;
+        const int tcpHeaderBytes = 20;
+        var frame = BuildIpv4Frame(
+            destinationMac,
+            sourceMac,
+            sourceIp,
+            destinationIp,
+            tcpHeaderBytes + applicationPayloadBytes);
+        frame[14 + ipv4HeaderBytes + 12] = 0x50;
         return frame;
     }
 }

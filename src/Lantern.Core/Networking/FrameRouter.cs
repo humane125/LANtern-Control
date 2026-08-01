@@ -16,7 +16,8 @@ public sealed record FrameRouteResult(
     FrameAction Action,
     TrafficDirection? Direction = null,
     PhysicalAddress? ClientMac = null,
-    byte[]? Frame = null);
+    byte[]? Frame = null,
+    int MeteredByteCount = 0);
 
 public sealed class FrameRouter
 {
@@ -70,7 +71,8 @@ public sealed class FrameRouter
                 frame,
                 uploadClientMac,
                 TrafficDirection.Upload,
-                gatewayMac);
+                gatewayMac,
+                ipv4.TransportPayloadLength);
         }
 
         if (ipv4.DestinationMac.Equals(localMac) &&
@@ -81,7 +83,8 @@ public sealed class FrameRouter
                 frame,
                 downloadClientMac,
                 TrafficDirection.Download,
-                downloadClientMac);
+                downloadClientMac,
+                ipv4.TransportPayloadLength);
         }
 
         return new FrameRouteResult(FrameAction.Ignore);
@@ -91,11 +94,16 @@ public sealed class FrameRouter
         ReadOnlySpan<byte> frame,
         PhysicalAddress clientMac,
         TrafficDirection direction,
-        PhysicalAddress destinationMac)
+        PhysicalAddress destinationMac,
+        int meteredByteCount)
     {
         if (!policy.ShouldForward(clientMac.ToString(), direction, frame.Length))
         {
-            return new FrameRouteResult(FrameAction.Drop, direction, clientMac);
+            return new FrameRouteResult(
+                FrameAction.Drop,
+                direction,
+                clientMac,
+                MeteredByteCount: meteredByteCount);
         }
 
         return new FrameRouteResult(
@@ -105,6 +113,7 @@ public sealed class FrameRouter
             EthernetFrameCodec.RewriteEthernetAddresses(
                 frame,
                 localMac,
-                destinationMac));
+                destinationMac),
+            meteredByteCount);
     }
 }
