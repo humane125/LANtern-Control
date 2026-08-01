@@ -107,6 +107,9 @@ public sealed class SettingsStore
                 Alias = string.IsNullOrWhiteSpace(pair.Value.Alias)
                     ? null
                     : pair.Value.Alias.Trim(),
+                LearnedHostName = string.IsNullOrWhiteSpace(pair.Value.LearnedHostName)
+                    ? null
+                    : pair.Value.LearnedHostName.Trim(),
                 DownloadKiloBytesPerSecond = Math.Max(
                     0,
                     pair.Value.DownloadKiloBytesPerSecond),

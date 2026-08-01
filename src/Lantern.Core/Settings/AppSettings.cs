@@ -10,6 +10,8 @@ public sealed class DevicePreferences
 {
     public string? Alias { get; set; }
 
+    public string? LearnedHostName { get; set; }
+
     public int DownloadKiloBytesPerSecond { get; set; }
 
     public int UploadKiloBytesPerSecond { get; set; }

@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly DeviceRegistry registry = new();
     private readonly TrafficPolicy policy = new();
     private readonly SettingsStore settingsStore = new();
+    private readonly SemaphoreSlim identitySaveSync = new(1, 1);
     private readonly DispatcherTimer refreshTimer;
     private readonly Dictionary<string, DeviceViewModel> deviceIndex =
         new(StringComparer.OrdinalIgnoreCase);
@@ -40,6 +41,7 @@ public partial class MainWindow : Window
         DataContext = this;
         engine = new PcapLanEngine(registry, policy);
         engine.StatusChanged += Engine_OnStatusChanged;
+        engine.DeviceIdentityLearned += Engine_OnDeviceIdentityLearned;
         refreshTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, RefreshDevices, Dispatcher);
         Loaded += MainWindow_OnLoaded;
         Closing += MainWindow_OnClosing;
@@ -340,7 +342,10 @@ public partial class MainWindow : Window
                 var lastKnownIp = IPAddress.TryParse(pair.Value.LastKnownIp, out var parsed)
                     ? parsed
                     : null;
-                hints.Add(new KnownDeviceHint(mac, lastKnownIp));
+                hints.Add(new KnownDeviceHint(
+                    mac,
+                    lastKnownIp,
+                    pair.Value.LearnedHostName));
             }
             catch (FormatException)
             {
@@ -364,6 +369,60 @@ public partial class MainWindow : Window
     private void Engine_OnStatusChanged(object? sender, string message)
     {
         _ = Dispatcher.InvokeAsync(() => DetailStatusText.Text = message);
+    }
+
+    private void Engine_OnDeviceIdentityLearned(
+        object? sender,
+        DeviceIdentityLearnedEventArgs eventArgs)
+    {
+        _ = Dispatcher
+            .InvokeAsync(() => PersistLearnedIdentityAsync(eventArgs))
+            .Task
+            .Unwrap();
+    }
+
+    private async Task PersistLearnedIdentityAsync(
+        DeviceIdentityLearnedEventArgs eventArgs)
+    {
+        await identitySaveSync.WaitAsync();
+        try
+        {
+            var lastKnownIp = registry.Peek()
+                .FirstOrDefault(device => device.MacAddress.Equals(eventArgs.MacAddress))?
+                .IpAddress
+                .ToString();
+            var identity = DeviceIdentityTracker.Learn(
+                settings,
+                eventArgs.MacAddress.ToString(),
+                eventArgs.HostName,
+                lastKnownIp);
+            if (identity.PreviousMacKey is not null)
+            {
+                policy.RemoveRule(identity.PreviousMacKey);
+            }
+
+            var rule = new TrafficRule(
+                    identity.Preferences.PauseInternet,
+                    identity.Preferences.DownloadKiloBytesPerSecond,
+                    identity.Preferences.UploadKiloBytesPerSecond)
+                .ForForwardingMode();
+            await engine.ApplyRuleAsync(identity.MacKey, rule);
+            UpdateKnownDeviceHints();
+            await settingsStore.SaveAsync(settings);
+            settingsDirty = false;
+            DetailStatusText.Text = identity.PreviousMacKey is null
+                ? $"Remembered {eventArgs.HostName}."
+                : $"Recognized {eventArgs.HostName} after its private MAC changed.";
+        }
+        catch (Exception exception) when (
+            exception is IOException or InvalidOperationException)
+        {
+            DetailStatusText.Text = exception.Message;
+        }
+        finally
+        {
+            identitySaveSync.Release();
+        }
     }
 
     private async void MainWindow_OnClosing(object? sender, CancelEventArgs eventArgs)

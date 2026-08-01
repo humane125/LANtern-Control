@@ -60,6 +60,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
     public event EventHandler<string>? StatusChanged;
 
+    public event EventHandler<DeviceIdentityLearnedEventArgs>? DeviceIdentityLearned;
+
     public void ReplaceKnownDeviceHints(IEnumerable<KnownDeviceHint> hints)
     {
         ArgumentNullException.ThrowIfNull(hints);
@@ -204,7 +206,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
             registry.Observe(
                 discovered.Key,
                 discovered.Value,
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                GetKnownHostName(discovered.Value));
         }
 
         await RefreshWindowsNeighborCacheAsync(
@@ -262,7 +265,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
             registry.Remember(
                 neighbor.Address,
                 neighbor.MacAddress,
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                GetKnownHostName(neighbor.MacAddress));
             _ = ResolveNameAsync(neighbor.Address, neighbor.MacAddress);
             if (controlling && needsPoison)
             {
@@ -507,6 +511,11 @@ public sealed class PcapLanEngine : IAsyncDisposable
         if (DhcpHostNameParser.TryParse(bytes, out var dhcpHost))
         {
             registry.SetHostName(dhcpHost.MacAddress, dhcpHost.HostName);
+            DeviceIdentityLearned?.Invoke(
+                this,
+                new DeviceIdentityLearnedEventArgs(
+                    dhcpHost.MacAddress,
+                    dhcpHost.HostName));
         }
 
         var result = frameRouter.Route(bytes);
@@ -558,7 +567,11 @@ public sealed class PcapLanEngine : IAsyncDisposable
             TrafficPolicy.NormalizeMac(arp.SenderMac.ToString()),
             arp.SenderIp);
         frameRouter?.UpdateClient(arp.SenderIp, arp.SenderMac);
-        registry.Observe(arp.SenderIp, arp.SenderMac, DateTimeOffset.UtcNow);
+        registry.Observe(
+            arp.SenderIp,
+            arp.SenderMac,
+            DateTimeOffset.UtcNow,
+            GetKnownHostName(arp.SenderMac));
         _ = ResolveNameAsync(arp.SenderIp, arp.SenderMac);
         RespondToArpRequest(arp);
         if (controlling && needsPoison)
@@ -609,6 +622,16 @@ public sealed class PcapLanEngine : IAsyncDisposable
         {
             return null;
         }
+    }
+
+    private string? GetKnownHostName(PhysicalAddress macAddress)
+    {
+        var key = TrafficPolicy.NormalizeMac(macAddress.ToString());
+        return knownDeviceHints.FirstOrDefault(
+            hint => string.Equals(
+                TrafficPolicy.NormalizeMac(hint.MacAddress.ToString()),
+                key,
+                StringComparison.OrdinalIgnoreCase))?.HostName;
     }
 
     private async Task RunMaintenanceAsync(CancellationToken cancellationToken)
