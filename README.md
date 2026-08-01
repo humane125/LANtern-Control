@@ -1,97 +1,168 @@
 <p align="center">
-  <img src="docs/assets/lantern-control-social-preview.png" alt="LANtern Control — Local Network Visibility &amp; Control" width="100%">
+  <img src="assets/lantern-control-social-preview.png" alt="LANtern Control — local network visibility and control" width="100%">
 </p>
 
 # LANtern Control
 
-LANtern Control is a native Windows application for discovering devices and
-applying SelfishNet-style IPv4 bandwidth controls without signing in to a
-router dashboard.
+LANtern Control is a router-independent Windows application for discovering,
+monitoring, and managing devices on a local IPv4 network. It provides
+SelfishNet-style bandwidth controls through a modern desktop interface without
+requiring access to the router's administration dashboard.
 
-## What it does
+> [!IMPORTANT]
+> LANtern Control is currently available for Windows. **Linux and macOS are
+> works in progress (WIP).**
 
-- Detects ordinary Ethernet and Wi-Fi LAN adapters at runtime.
-- Discovers IPv4 devices from the Windows neighbor cache and normal LAN traffic.
-- Resolves device names through reverse DNS, NetBIOS, mDNS, and passively observed DHCP hostnames, with inline saved aliases.
-- Persists DHCP identities and safely transfers saved aliases and limits when a unique device hostname returns with a changed private MAC.
-- Marks clients offline after missed liveness checks and hides them after 45 seconds while retaining saved names and limits.
-- Restores the router and client ARP mappings directly when control stops, preventing stale controller identities in router dashboards.
-- Refreshes the passive device list every five seconds without sweeping or
-  probing every address on the subnet.
-- Shows live download and upload rates for every redirected device.
-- Shows per-device visited domains observed through DNS queries, TLS server names,
-  and plain HTTP host headers without decrypting private HTTPS content.
-- Applies independent download and upload limits in `KB/s`.
-- Pauses a device's IPv4 internet in both directions.
-- Saves rules per MAC address.
-- Sends corrective ARP mappings when control stops or the window closes.
-- Uses separate ARP and packet-forwarding handles with a dedicated blocking
-  forwarding loop, matching the architecture validated with SelfishNet.
+## Features
 
-It contains no Xiaomi or Tunisie Telecom login code. The Xiaomi
-`192.168.31.1` LAN can be used now; later, connect the PC directly to the
-Tunisie Telecom LAN and select its `192.168.100.x` adapter.
+- Discover devices connected to the same Ethernet or Wi-Fi network.
+- Resolve device names using DHCP, reverse DNS, NetBIOS, and mDNS information.
+- Remember device names, aliases, and rules between application launches.
+- Display live per-device download and upload speeds.
+- Keep a one-hour network activity chart with one-second samples.
+- Apply independent download and upload limits in `KB/s`.
+- Pause and restore a device's IPv4 internet connection.
+- Observe domains through DNS queries, TLS server names, and plain HTTP host
+  headers without decrypting private HTTPS content.
+- Block domains for individual devices, including presets for common services.
+- Restore normal client and router ARP mappings when control stops.
+- Check GitHub Releases for optional application updates.
+- Choose between an installer and a portable executable.
 
 ## Requirements
 
-- Windows 10 or 11, x64.
+- Windows 10 or Windows 11, x64.
 - Administrator access.
-- WinPcap, or Npcap installed with **WinPcap API-compatible mode** enabled.
-- The controller PC and target devices on the same IPv4 broadcast LAN.
+- [Npcap](https://npcap.com/#download) installed on the controller computer.
+  WinPcap API-compatible mode is recommended for compatibility.
+- The controller computer and target devices must be on the same IPv4 broadcast
+  network.
+- A stable network connection. Ethernet is recommended; if Wi-Fi is used, keep
+  the controller close enough to the router for a strong signal.
 
-The current PC already has the WinPcap runtime. LANtern Control starts its NPF
-driver when launched as Administrator.
+LANtern Control does not include or redistribute Npcap. Install Npcap separately
+from its official website, then restart LANtern Control.
 
-## Start
+## Installation
 
-1. Open `LANtern-Control.exe` and accept the Windows Administrator prompt.
-2. Select the adapter whose gateway is the router you want to control.
-3. Click **Start control**.
-4. Wait for devices to appear.
-5. Enter download/upload limits in `KB/s`; `0` means unlimited.
-6. Use **Pause internet** to stop a device's IPv4 internet.
-7. Click **Stop & restore** before changing networks or closing the program.
+Download the latest version from [GitHub Releases](https://github.com/humane125/LANtern-Control/releases/latest).
 
-No rule changes the router permanently. While control is active, LANtern uses
-two-way forwarding for discovered devices so live download and upload rates stay
-visible even when both limits are `0`. A zero value is unlimited; positive values
-enable shaping, and the pause switch blocks forwarding. Corrective ARP traffic is
-sent when control stops. Saved rules activate when control starts.
+### Installer
 
-Device discovery combines the Windows neighbor cache with a paced ARP scan of
-the local `/24`. The scan runs every five seconds and spaces requests out so it
-does not create the burst that caused packet loss on weak routers. Larger
-networks are limited to the controller PC's local `/24`.
+1. Download `LANtern-Control-Setup-v0.1.0.exe`.
+2. Run the setup program.
+3. Choose the installation folder and whether to create Start Menu or desktop
+   shortcuts.
+4. Launch LANtern Control and accept the Administrator prompt.
 
-LANtern uses normal rather than promiscuous packet capture, separate handles for
-ARP and forwarded IP traffic, a one-millisecond blocking capture loop, and a
-five-second ARP maintenance interval. If the forwarding loop fails, it cancels
-control and restores normal ARP mappings automatically.
+### Portable version
 
-## Compatibility limits
+1. Download `LANtern-Control-v0.1.0.exe`.
+2. Place it in a folder where it can remain.
+3. Run it as Administrator. No application installation is required.
 
-This technique works on many ordinary home routers because it operates on the
-local IPv4 LAN rather than through a vendor API. It cannot be guaranteed on
-every Wi-Fi:
+## How to use
 
-- Guest/client isolation prevents direct LAN control.
-- Dynamic ARP inspection or ARP protection blocks interception.
+1. Launch LANtern Control as Administrator.
+2. Select the network adapter whose local IP address and gateway match the
+   network you want to manage.
+3. Click **Start control** and wait for connected devices to appear.
+4. Click **Refresh devices** when you want to run a fresh discovery scan.
+5. Enter a download or upload limit in `KB/s`. A value of `0` means unlimited.
+6. Use the **Internet** switch to pause or restore a device's connection.
+7. Open **Visited domains** to inspect the destination domains LANtern can
+   observe for each device.
+8. Add individual domain rules or use a service preset to block domains for a
+   selected device.
+9. Click **Stop & restore** before changing adapters, leaving the network, or
+   shutting down the controller computer.
+
+Settings, saved device identities, and rules are stored locally in:
+
+```text
+%LOCALAPPDATA%\LANternControl\settings.json
+```
+
+No router username or password is required, and LANtern does not permanently
+change the router configuration.
+
+## Domain visibility and blocking
+
+LANtern can identify many destination domains, but it does not decrypt HTTPS,
+read searches, inspect messages, or view private page contents. Domain blocking
+is best effort because applications may use cached connections, several CDN
+domains, or encrypted protocols.
+
+The following can hide domains or bypass domain-based rules:
+
+- VPNs, Tor, and proxy applications.
+- Encrypted DNS such as DoH or DoT.
+- TLS Encrypted Client Hello (ECH).
+- QUIC/HTTP3 and cached or already-open connections.
+- Applications that use direct IP addresses or frequently changing domains.
+
+## Network compatibility
+
+LANtern operates on the local IPv4 network rather than through a router-specific
+API, so it can work with many ordinary home routers. It cannot be guaranteed on
+every network or adapter.
+
 - IPv6 traffic is not controlled in this release.
-- Devices behind another router/NAT are not on the same broadcast LAN.
-- Some Wi-Fi adapter drivers do not support raw packet injection.
-- VPNs, Tor, encrypted DNS, QUIC, and TLS Encrypted Client Hello can hide the
-  destination domain from the activity view.
+- Guest Wi-Fi or client isolation can prevent discovery and control.
+- Dynamic ARP inspection or other ARP protection can block interception.
+- Devices behind another router or NAT are not on the same broadcast LAN.
+- Some Wi-Fi drivers do not reliably support packet capture or injection.
+- While a device is redirected, the controller computer becomes part of its
+  traffic path. A weak controller connection can reduce speed or increase
+  latency for that device.
+- The controller must remain awake and connected while rules are active.
 
-Use this only on networks and devices you own or administer.
+## Troubleshooting
 
-## Build
+### Npcap is not detected
+
+Install the latest version from the [official Npcap download page](https://npcap.com/#download),
+enable WinPcap API-compatible mode if offered, and restart LANtern Control.
+
+### Devices do not appear
+
+- Confirm that the correct adapter is selected.
+- Make sure the controller and devices are on the same normal LAN, not an
+  isolated guest network.
+- Run LANtern Control as Administrator.
+- Click **Refresh devices** and allow the discovery scan to finish.
+
+### A device loses connectivity
+
+Click **Stop & restore** and wait for the application to repair the normal ARP
+mappings. If connectivity does not return, reconnect the affected device to
+Wi-Fi or disable and re-enable its network adapter.
+
+## Building from source
+
+The Windows application requires the .NET 8 SDK. Inno Setup 6 is also required
+to produce the setup executable.
 
 ```powershell
 dotnet test .\tests\Lantern.Core.Tests\Lantern.Core.Tests.csproj
+dotnet test .\tests\Lantern.App.Tests\Lantern.App.Tests.csproj
 .\scripts\publish.ps1
 ```
 
-The self-contained executable is written to `release\LANtern-Control.exe`.
+The publishing script creates the portable application and installer in the
+`outputs` folder.
+
+## Responsible use
+
+Use LANtern Control only on networks and devices that you own or are authorized
+to administer. Pausing, limiting, monitoring, or blocking another person's
+traffic without permission may violate policies or local laws.
+
+## Feedback and bug reports
+
+If you find a problem, [open a GitHub issue](https://github.com/humane125/LANtern-Control/issues)
+and include the LANtern version, Windows version, adapter type, Npcap version,
+router model, and steps needed to reproduce it.
 
 ---
 
