@@ -1,5 +1,5 @@
 #define MyAppName "LANtern Control"
-#define MyAppVersion "0.3.29"
+#define MyAppVersion "0.1.0"
 #define MyAppPublisher "LANtern Control"
 #define MyAppExeName "LANtern Control.exe"
 

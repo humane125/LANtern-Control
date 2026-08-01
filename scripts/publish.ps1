@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $publishedExe = Join-Path $publishDirectory "LANtern Control.exe"
 Write-Host "Published: $publishedExe"
-$portableExe = Join-Path $projectRoot "outputs\LANtern-Control-v0.3.29.exe"
+$portableExe = Join-Path $projectRoot "outputs\LANtern-Control-v0.1.0.exe"
 Copy-Item -LiteralPath $publishedExe -Destination $portableExe -Force
 Write-Host "Portable: $portableExe"
 
@@ -58,5 +58,5 @@ if ($LASTEXITCODE -ne 0) {
     throw "Installer compilation failed."
 }
 
-$installer = Join-Path $projectRoot "outputs\LANtern-Control-Setup-v0.3.29.exe"
+$installer = Join-Path $projectRoot "outputs\LANtern-Control-Setup-v0.1.0.exe"
 Write-Host "Installer: $installer"
