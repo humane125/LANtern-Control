@@ -60,6 +60,26 @@ public static class ArpInterceptionFrames
                 gatewayMac,
                 gatewayIp));
 
+    public static ArpPeerFrames BuildRestore(
+        PhysicalAddress controllerMac,
+        IPAddress gatewayIp,
+        PhysicalAddress gatewayMac,
+        IPAddress clientIp,
+        PhysicalAddress clientMac) =>
+        new(
+            EthernetFrameCodec.BuildArpReplyWithEthernetSource(
+                controllerMac,
+                gatewayMac,
+                gatewayIp,
+                clientMac,
+                clientIp),
+            EthernetFrameCodec.BuildArpReplyWithEthernetSource(
+                controllerMac,
+                clientMac,
+                clientIp,
+                gatewayMac,
+                gatewayIp));
+
     public static ArpControllerFrames BuildControllerProtection(
         PhysicalAddress controllerMac,
         IPAddress controllerIp,
