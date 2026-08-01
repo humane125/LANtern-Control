@@ -86,4 +86,4 @@ The self-contained executable is written to `release\LANtern-Control.exe`.
 
 ---
 
-**This Project Was VibeCoded**
+**This project was vibecoded so you can expect bugs please leave an issue if you find any**
