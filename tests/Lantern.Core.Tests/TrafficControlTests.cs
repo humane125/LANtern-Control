@@ -59,22 +59,27 @@ public sealed class TrafficControlTests
     }
 
     [Fact]
-    public void TrafficPolicy_UnlimitedDevicesDoNotRequireInterception()
+    public void TrafficPolicy_UnlimitedDevicesUseTwoWayInterceptionForLiveRates()
     {
         var policy = new TrafficPolicy();
         policy.SetRule("00:11:22:33:44:01", new TrafficRule(false, 0, 0));
 
-        Assert.False(policy.RequiresInterception("00:11:22:33:44:01"));
-        Assert.False(policy.RequiresInterception("00:11:22:33:44:05"));
+        Assert.True(policy.RequiresInterception("00:11:22:33:44:01"));
+        Assert.Equal(
+            InterceptionTargets.Client | InterceptionTargets.Gateway,
+            policy.GetInterceptionTargets("00:11:22:33:44:01"));
+        Assert.Equal(
+            InterceptionTargets.Client | InterceptionTargets.Gateway,
+            policy.GetInterceptionTargets("00:11:22:33:44:05"));
     }
 
     [Theory]
-    [InlineData(false, 0, 0, InterceptionTargets.None)]
-    [InlineData(true, 0, 0, InterceptionTargets.Client)]
-    [InlineData(false, 0, 50, InterceptionTargets.Client)]
+    [InlineData(false, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    [InlineData(true, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    [InlineData(false, 0, 50, InterceptionTargets.Client | InterceptionTargets.Gateway)]
     [InlineData(false, 100, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
     [InlineData(false, 100, 50, InterceptionTargets.Client | InterceptionTargets.Gateway)]
-    public void TrafficPolicy_RedirectsOnlyThePeersRequiredByTheRule(
+    public void TrafficPolicy_UsesTwoWayMonitoringForEveryRule(
         bool pause,
         int downloadLimit,
         int uploadLimit,

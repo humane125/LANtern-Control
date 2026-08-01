@@ -46,17 +46,11 @@ driver when launched as Administrator.
 6. Use **Pause internet** to stop a device's IPv4 internet.
 7. Click **Stop & restore** before changing networks or closing the program.
 
-No rule changes the router permanently. LANtern uses adaptive interception so
-unlimited devices remain on their normal direct path. Upload-only limits and
-pause rules redirect only the client side; a download limit redirects both the
-client and gateway sides so LANtern can shape downloads. Removing a rule sends
-corrective ARP traffic immediately. Saved rules activate only when control is
-started.
-
-Because direct download traffic does not pass through the controller, unlimited
-and upload-only devices do not report complete download rates in LANtern. This
-keeps the router's normal client mapping intact unless a download limit actually
-requires two-way forwarding.
+No rule changes the router permanently. While control is active, LANtern uses
+two-way forwarding for discovered devices so live download and upload rates stay
+visible even when both limits are `0`. A zero value is unlimited; positive values
+enable shaping, and the pause switch blocks forwarding. Corrective ARP traffic is
+sent when control stops. Saved rules activate when control starts.
 
 Device discovery combines the Windows neighbor cache with a paced ARP scan of
 the local `/24`. The scan runs every five seconds and spaces requests out so it
