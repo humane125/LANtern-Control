@@ -99,11 +99,7 @@ public sealed class FrameRouter
     {
         if (!policy.ShouldForward(clientMac.ToString(), direction, frame.Length))
         {
-            return new FrameRouteResult(
-                FrameAction.Drop,
-                direction,
-                clientMac,
-                MeteredByteCount: meteredByteCount);
+            return new FrameRouteResult(FrameAction.Drop, direction, clientMac);
         }
 
         return new FrameRouteResult(
