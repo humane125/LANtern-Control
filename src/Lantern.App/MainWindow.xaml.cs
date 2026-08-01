@@ -242,20 +242,35 @@ public partial class MainWindow : Window
                 device.DownloadLimit,
                 device.UploadLimit)
             .ForForwardingMode();
+        var ruleChanged =
+            preferences.DownloadKiloBytesPerSecond != rule.DownloadKiloBytesPerSecond ||
+            preferences.UploadKiloBytesPerSecond != rule.UploadKiloBytesPerSecond ||
+            preferences.PauseInternet != rule.PauseInternet;
+        var aliasChanged = !string.Equals(
+            preferences.Alias,
+            device.Alias,
+            StringComparison.Ordinal);
         preferences.DownloadKiloBytesPerSecond = rule.DownloadKiloBytesPerSecond;
         preferences.UploadKiloBytesPerSecond = rule.UploadKiloBytesPerSecond;
         preferences.PauseInternet = rule.PauseInternet;
+        preferences.Alias = device.Alias;
 
         try
         {
-            await engine.ApplyRuleAsync(device.MacKey, rule);
+            if (ruleChanged)
+            {
+                await engine.ApplyRuleAsync(device.MacKey, rule);
+            }
+
             await settingsStore.SaveAsync(settings);
             settingsDirty = false;
             await Dispatcher.InvokeAsync(
                 () =>
                 {
                     DetailStatusText.Text =
-                        engine.IsRunning
+                        aliasChanged && !ruleChanged
+                            ? $"Device renamed to {device.DisplayName}."
+                            : engine.IsRunning
                             ? $"Rule applied to {device.DisplayName}."
                             : $"Rule saved for {device.DisplayName}; it activates when control starts.";
                     RefreshDashboardSummary(addTrafficSample: false);
