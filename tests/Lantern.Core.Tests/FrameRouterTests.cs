@@ -85,6 +85,7 @@ public sealed class FrameRouterTests
         var result = router.Route(frame);
 
         Assert.Equal(FrameAction.Drop, result.Action);
+        Assert.Equal(0, result.MeteredByteCount);
         Assert.Null(result.Frame);
     }
 
