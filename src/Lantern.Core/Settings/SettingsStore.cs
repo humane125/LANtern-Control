@@ -89,7 +89,11 @@ public sealed class SettingsStore
 
     private static AppSettings Normalize(AppSettings settings)
     {
-        var normalized = new AppSettings();
+        var normalized = new AppSettings
+        {
+            DisableUpdateChecks = settings.DisableUpdateChecks,
+            LastUpdateCheckUtc = settings.LastUpdateCheckUtc?.ToUniversalTime(),
+        };
         foreach (var pair in settings.Devices)
         {
             string mac;
@@ -119,6 +123,40 @@ public sealed class SettingsStore
                 PauseInternet = pair.Value.PauseInternet,
                 LastKnownIp = NormalizeIpv4(pair.Value.LastKnownIp),
             };
+        }
+
+        foreach (var pair in settings.BlockedDomains)
+        {
+            string mac;
+            try
+            {
+                mac = TrafficPolicy.NormalizeMac(pair.Key);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            var domains = new List<string>();
+            foreach (var candidate in pair.Value ?? [])
+            {
+                try
+                {
+                    domains.Add(TrafficPolicy.NormalizeDomain(candidate));
+                }
+                catch (FormatException)
+                {
+                }
+            }
+
+            var normalizedDomains = domains
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (normalizedDomains.Count > 0)
+            {
+                normalized.BlockedDomains[mac] = normalizedDomains;
+            }
         }
 
         return normalized;

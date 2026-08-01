@@ -59,6 +59,63 @@ public sealed class TrafficControlTests
     }
 
     [Fact]
+    public void TrafficPolicy_DomainBlocksAreNormalizedAndScopedToOneDevice()
+    {
+        const string blockedMac = "E2-61-19-0D-BD-54";
+        const string otherMac = "00-11-22-33-44-55";
+        var policy = new TrafficPolicy();
+        var setBlockedDomains = typeof(TrafficPolicy).GetMethod("SetBlockedDomains");
+        var shouldBlockDomain = typeof(TrafficPolicy).GetMethod("ShouldBlockDomain");
+
+        Assert.NotNull(setBlockedDomains);
+        Assert.NotNull(shouldBlockDomain);
+        setBlockedDomains.Invoke(
+            policy,
+            [blockedMac, new[] { " YouTube.COM. " }]);
+
+        Assert.True((bool)shouldBlockDomain.Invoke(policy, [blockedMac, "youtube.com"])!);
+        Assert.True((bool)shouldBlockDomain.Invoke(policy, [blockedMac, "www.youtube.com"])!);
+        Assert.False((bool)shouldBlockDomain.Invoke(policy, [blockedMac, "notyoutube.com"])!);
+        Assert.False((bool)shouldBlockDomain.Invoke(policy, [otherMac, "youtube.com"])!);
+    }
+
+    [Fact]
+    public void DomainBlockPresets_CoverRequestedAppsAndTheirServiceHosts()
+    {
+        var catalogType = typeof(TrafficPolicy).Assembly.GetType(
+            "Lantern.Core.Control.DomainBlockPresetCatalog");
+        Assert.NotNull(catalogType);
+        var allProperty = catalogType.GetProperty("All");
+        Assert.NotNull(allProperty);
+        var presets = Assert.IsAssignableFrom<System.Collections.IEnumerable>(
+                allProperty.GetValue(null))
+            .Cast<object>()
+            .ToArray();
+        var names = presets.Select(preset =>
+                (string)preset.GetType().GetProperty("Name")!.GetValue(preset)!)
+            .ToArray();
+
+        Assert.Equal(
+            ["YouTube", "Instagram", "Facebook", "Snapchat", "Discord", "Messenger"],
+            names);
+        var youtube = presets[0];
+        var domains = Assert.IsAssignableFrom<IEnumerable<string>>(
+            youtube.GetType().GetProperty("Domains")!.GetValue(youtube));
+        var policy = new TrafficPolicy();
+        policy.SetBlockedDomains("E261190DBD54", domains);
+
+        Assert.True(policy.ShouldBlockDomain("E261190DBD54", "r5.googlevideo.com"));
+        Assert.True(policy.ShouldBlockDomain("E261190DBD54", "youtubei.googleapis.com"));
+        Assert.False(policy.ShouldBlockDomain("E261190DBD54", "instagram.com"));
+
+        var instagram = presets[1];
+        var instagramDomains = Assert.IsAssignableFrom<IEnumerable<string>>(
+            instagram.GetType().GetProperty("Domains")!.GetValue(instagram));
+        Assert.Contains("facebook.com", instagramDomains);
+        Assert.Contains("fbcdn.net", instagramDomains);
+    }
+
+    [Fact]
     public void TrafficPolicy_UnlimitedDevicesUseTwoWayInterceptionForLiveRates()
     {
         var policy = new TrafficPolicy();
@@ -175,6 +232,25 @@ public sealed class TrafficControlTests
 
         var snapshot = Assert.Single(registry.Peek());
         Assert.Equal(start, snapshot.LastSeen);
+    }
+
+    [Fact]
+    public void DeviceRegistry_NewCachedNeighborRemainsUnconfirmedUntilObserved()
+    {
+        var start = DateTimeOffset.Parse("2026-08-01T12:00:00Z");
+        var registry = new DeviceRegistry(start);
+        var mac = PhysicalAddress.Parse("D2574CDCA5B2");
+        var address = IPAddress.Parse("192.168.31.225");
+
+        registry.Remember(address, mac, start);
+
+        var cached = Assert.Single(registry.Peek());
+        Assert.Equal(DateTimeOffset.MinValue, cached.LastSeen);
+
+        registry.Observe(address, mac, start.AddSeconds(1));
+
+        var confirmed = Assert.Single(registry.Peek());
+        Assert.Equal(start.AddSeconds(1), confirmed.LastSeen);
     }
 
     [Fact]

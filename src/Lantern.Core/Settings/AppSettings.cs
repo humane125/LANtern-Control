@@ -2,7 +2,14 @@ namespace Lantern.Core.Settings;
 
 public sealed class AppSettings
 {
+    public bool DisableUpdateChecks { get; set; }
+
+    public DateTimeOffset? LastUpdateCheckUtc { get; set; }
+
     public Dictionary<string, DevicePreferences> Devices { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public Dictionary<string, List<string>> BlockedDomains { get; init; } =
         new(StringComparer.OrdinalIgnoreCase);
 }
 

@@ -49,7 +49,7 @@ public sealed class DeviceRegistry
                 IpAddress = ipAddress,
                 HostName = hostName,
                 FirstSeen = timestamp,
-                LastSeen = timestamp,
+                LastSeen = refreshLastSeen ? timestamp : DateTimeOffset.MinValue,
             },
             (_, existing) =>
             {
