@@ -13,6 +13,7 @@ router dashboard.
 - Detects ordinary Ethernet and Wi-Fi LAN adapters at runtime.
 - Discovers IPv4 devices from the Windows neighbor cache and normal LAN traffic.
 - Resolves device names through reverse DNS, NetBIOS, mDNS, and passively observed DHCP hostnames, with inline saved aliases.
+- Persists DHCP identities and safely transfers saved aliases and limits when a unique device hostname returns with a changed private MAC.
 - Marks clients offline after missed liveness checks and hides them after 45 seconds while retaining saved names and limits.
 - Restores the router and client ARP mappings directly when control stops, preventing stale controller identities in router dashboards.
 - Refreshes the passive device list every five seconds without sweeping or

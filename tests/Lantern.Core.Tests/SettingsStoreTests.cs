@@ -18,6 +18,7 @@ public sealed class SettingsStoreTests
                     ["e2:61:19:0d:bd:54"] = new DevicePreferences
                     {
                         Alias = "Living room",
+                        LearnedHostName = "POCO-F6",
                         DownloadKiloBytesPerSecond = 500,
                         UploadKiloBytesPerSecond = 100,
                         PauseInternet = true,
@@ -32,6 +33,7 @@ public sealed class SettingsStoreTests
             var saved = Assert.Single(loaded.Devices);
             Assert.Equal("E261190DBD54", saved.Key);
             Assert.Equal("Living room", saved.Value.Alias);
+            Assert.Equal("POCO-F6", saved.Value.LearnedHostName);
             Assert.Equal(500, saved.Value.DownloadKiloBytesPerSecond);
             Assert.Equal(100, saved.Value.UploadKiloBytesPerSecond);
             Assert.True(saved.Value.PauseInternet);

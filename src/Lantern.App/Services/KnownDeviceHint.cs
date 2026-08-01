@@ -5,4 +5,5 @@ namespace Lantern.App.Services;
 
 public sealed record KnownDeviceHint(
     PhysicalAddress MacAddress,
-    IPAddress? LastKnownIp);
+    IPAddress? LastKnownIp,
+    string? HostName);
