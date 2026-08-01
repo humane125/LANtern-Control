@@ -9,16 +9,14 @@
     <ApplicationIcon>Assets\RedWatcher.ico</ApplicationIcon>
     <AssemblyName>LANtern Control</AssemblyName>
     <RootNamespace>Lantern.App</RootNamespace>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Product>LANtern Control</Product>
     <Description>Router-independent IPv4 LAN bandwidth control for Windows.</Description>
     <Authors>LANtern Control</Authors>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <PublishSingleFile>true</PublishSingleFile>
+    <PublishSingleFile>false</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>

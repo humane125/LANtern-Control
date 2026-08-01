@@ -1,0 +1,82 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="LANtern Control"
+           Manufacturer="LANtern Control"
+           Version="0.1.2"
+           UpgradeCode="04C973A1-E90F-4E07-9C93-C3EF9C189A66"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Language="1033">
+    <SummaryInformation Description="LANtern Control installer"
+                        Manufacturer="LANtern Control" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of LANtern Control is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="..\src\Lantern.App\Assets\RedWatcher.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="LANtern Control" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="LANtern Control">
+        <Component Id="StartMenuShortcutComponent">
+          <Shortcut Id="StartMenuShortcut"
+                    Name="LANtern Control"
+                    Description="LANtern Control"
+                    Target="[INSTALLFOLDER]LANtern Control.exe"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="AppIcon" />
+          <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+          <RegistryValue Root="HKCU"
+                         Key="Software\LANtern Control"
+                         Name="StartMenuShortcut"
+                         Type="integer"
+                         Value="1"
+                         KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcutComponent">
+        <Shortcut Id="DesktopShortcut"
+                  Name="LANtern Control"
+                  Description="LANtern Control"
+                  Target="[INSTALLFOLDER]LANtern Control.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\LANtern Control"
+                       Name="DesktopShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="ApplicationFeature"
+             Title="LANtern Control application"
+             Description="Required application files."
+             Level="1"
+             AllowAbsent="no">
+      <Files Include="$(var.PublishDir)\**" Directory="INSTALLFOLDER" />
+    </Feature>
+    <Feature Id="StartMenuShortcutFeature"
+             Title="Start Menu shortcut"
+             Description="Create a Start Menu shortcut."
+             Level="1">
+      <ComponentRef Id="StartMenuShortcutComponent" />
+    </Feature>
+    <Feature Id="DesktopShortcutFeature"
+             Title="Desktop shortcut"
+             Description="Create a desktop shortcut."
+             Level="200">
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_Mondo" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+  </Package>
+</Wix>

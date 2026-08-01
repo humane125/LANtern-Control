@@ -4,7 +4,7 @@
 
 # LANtern Control — Open-Source SelfishNet Alternative for Windows
 
-<a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.1" src="https://img.shields.io/badge/release-v0.1.1-C51B3A?style=flat-square"></a>
+<a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.2" src="https://img.shields.io/badge/release-v0.1.2-C51B3A?style=flat-square"></a>
 <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-C51B3A?style=flat-square"></a>
 <img alt="C#" src="https://img.shields.io/badge/language-C%23-239120?style=flat-square&amp;logo=csharp">
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&amp;logo=dotnet">
@@ -38,7 +38,7 @@ use case.
 - Block domains for individual devices, including presets for common services.
 - Restore normal client and router ARP mappings when control stops.
 - Check GitHub Releases for optional application updates.
-- Choose between an installer and a portable executable.
+- Choose between an installer and a portable ZIP package.
 
 ## Screenshots
 
@@ -77,7 +77,7 @@ Download the latest version from [GitHub Releases](https://github.com/humane125/
 
 ### Installer
 
-1. Download `LANtern-Control-Setup-v0.1.1.exe`.
+1. Download `LANtern-Control-Setup-v0.1.2.msi`.
 2. Run the setup program.
 3. Choose the installation folder and whether to create Start Menu or desktop
    shortcuts.
@@ -85,9 +85,10 @@ Download the latest version from [GitHub Releases](https://github.com/humane125/
 
 ### Portable version
 
-1. Download `LANtern-Control-v0.1.1.exe`.
-2. Place it in a folder where it can remain.
-3. Run it as Administrator. No application installation is required.
+1. Download `LANtern-Control-v0.1.2-win-x64.zip`.
+2. Extract the complete archive to a folder where it can remain.
+3. Run `LANtern Control.exe` as Administrator from that folder. Keep the
+   extracted files together; no application installation is required.
 
 ## How to use
 
@@ -168,8 +169,8 @@ Wi-Fi or disable and re-enable its network adapter.
 
 ## Building from source
 
-The Windows application requires the .NET 8 SDK. Inno Setup 6 is also required
-to produce the setup executable.
+The Windows application requires the .NET 8 SDK. The WiX 5 SDK used to produce
+the standard MSI is restored automatically by `dotnet`.
 
 ```powershell
 dotnet test .\tests\Lantern.Core.Tests\Lantern.Core.Tests.csproj
