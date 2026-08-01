@@ -2,9 +2,12 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Shell;
 using Lantern.App;
 using Lantern.App.ViewModels;
 using Lantern.Core.Devices;
@@ -71,14 +74,30 @@ public sealed class DeviceViewModelTests
                     Assert.True(upload.R > upload.B && upload.R > upload.G);
                     Assert.True(success.G > success.R && success.G > success.B);
 
+                    var scrollBarStyle = Assert.IsType<Style>(app.Resources[typeof(ScrollBar)]);
+                    Assert.Contains(
+                        scrollBarStyle.Setters,
+                        setter => setter is Setter { Property: var property } &&
+                                  property == Control.TemplateProperty);
+
                     var window = new MainWindow();
+                    Assert.Equal(WindowStyle.None, window.WindowStyle);
+                    Assert.Equal(ResizeMode.CanResize, window.ResizeMode);
+                    var windowChrome = Assert.IsType<WindowChrome>(
+                        WindowChrome.GetWindowChrome(window));
+                    Assert.True(windowChrome.CaptionHeight >= 38);
+                    Assert.True(windowChrome.ResizeBorderThickness.Left >= 6);
                     foreach (var name in new[]
                     {
+                        "CustomTitleBar",
+                        "MinimizeWindowButton",
+                        "MaximizeWindowButton",
+                        "CloseWindowButton",
                         "Sidebar",
                         "BrandLogo",
                         "OverviewNavButton",
                         "ActivityNavButton",
-                        "AdapterNavButton",
+                        "DomainRulesNavButton",
                         "AdapterStrip",
                         "MetricsPanel",
                         "ConnectedDevicesMetric",
@@ -86,6 +105,18 @@ public sealed class DeviceViewModelTests
                         "UploadMetric",
                         "ActiveRulesMetric",
                         "ActivitySection",
+                        "WebsiteActivitySection",
+                        "WebsiteActivityDeviceList",
+                        "ClearActivityButton",
+                        "DomainRulesSection",
+                        "DomainPresetDeviceSelector",
+                        "DomainPresetSelector",
+                        "ApplyDomainPresetButton",
+                        "DomainRuleDeviceSelector",
+                        "DomainRuleInput",
+                        "AddDomainRuleButton",
+                        "DomainRulesList",
+                        "DomainRulesEmptyState",
                         "ChartRangeText",
                         "ChartTopDeviceText",
                         "DeviceSection",
@@ -93,6 +124,96 @@ public sealed class DeviceViewModelTests
                     {
                         Assert.NotNull(window.FindName(name));
                     }
+
+                    var minimizeButton = Assert.IsType<Button>(
+                        window.FindName("MinimizeWindowButton"));
+                    minimizeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(WindowState.Minimized, window.WindowState);
+                    window.WindowState = WindowState.Normal;
+
+                    var maximizeButton = Assert.IsType<Button>(
+                        window.FindName("MaximizeWindowButton"));
+                    maximizeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(WindowState.Maximized, window.WindowState);
+                    maximizeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(WindowState.Normal, window.WindowState);
+
+                    Assert.Null(window.FindName("AdapterNavButton"));
+
+                    var adapterStrip = Assert.IsType<Border>(window.FindName("AdapterStrip"));
+                    Assert.True(
+                        adapterStrip.Margin.Left >= 12,
+                        "The network adapter card must not touch the left content border.");
+
+                    var adapterSelector = Assert.IsType<ComboBox>(
+                        window.FindName("AdapterSelector"));
+                    adapterSelector.ApplyTemplate();
+                    var dropDownToggle = Assert.IsType<ToggleButton>(
+                        adapterSelector.Template.FindName("DropDownToggle", adapterSelector));
+                    dropDownToggle.ApplyTemplate();
+                    var comboBorder = Assert.IsType<Border>(
+                        dropDownToggle.Template.FindName("ComboBorder", dropDownToggle));
+                    Assert.True(
+                        comboBorder.Padding.Left >= 12,
+                        "The selected adapter text needs a visible inset from its input border. " +
+                        $"Selector={adapterSelector.Padding.Left}, " +
+                        $"Toggle={dropDownToggle.Padding.Left}, " +
+                        $"Border={comboBorder.Padding.Left}.");
+
+                    var localIpBlock = Assert.IsType<StackPanel>(
+                        window.FindName("LocalIpBlock"));
+                    Assert.True(
+                        localIpBlock.Margin.Left >= 16,
+                        "The Local IP block needs a visible inset from its column edge.");
+
+                    var websiteDeviceList = Assert.IsType<ItemsControl>(
+                        window.FindName("WebsiteActivityDeviceList"));
+                    var activityItem = Assert.IsType<Border>(
+                        websiteDeviceList.ItemTemplate.LoadContent());
+                    var deviceExpander = Assert.IsType<Expander>(activityItem.Child);
+                    var expandedBinding = Assert.IsType<Binding>(
+                        BindingOperations.GetBinding(
+                            deviceExpander,
+                            Expander.IsExpandedProperty));
+                    Assert.Equal("IsExpanded", expandedBinding.Path.Path);
+                    Assert.Equal(BindingMode.TwoWay, expandedBinding.Mode);
+
+                    var overviewSection = Assert.IsType<Grid>(window.FindName("OverviewSection"));
+                    var websiteSection = Assert.IsType<Border>(
+                        window.FindName("WebsiteActivitySection"));
+                    var domainRulesSection = Assert.IsType<Border>(
+                        window.FindName("DomainRulesSection"));
+                    Assert.Equal(Visibility.Visible, overviewSection.Visibility);
+                    Assert.Equal(Visibility.Collapsed, websiteSection.Visibility);
+                    Assert.Equal(Visibility.Collapsed, domainRulesSection.Visibility);
+
+                    var activityNav = Assert.IsType<Button>(window.FindName("ActivityNavButton"));
+                    activityNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(Visibility.Collapsed, overviewSection.Visibility);
+                    Assert.Equal(Visibility.Visible, websiteSection.Visibility);
+
+                    var overviewNav = Assert.IsType<Button>(window.FindName("OverviewNavButton"));
+                    overviewNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(Visibility.Visible, overviewSection.Visibility);
+                    Assert.Equal(Visibility.Collapsed, websiteSection.Visibility);
+
+                    var domainRulesNav = Assert.IsType<Button>(
+                        window.FindName("DomainRulesNavButton"));
+                    domainRulesNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(Visibility.Collapsed, overviewSection.Visibility);
+                    Assert.Equal(Visibility.Collapsed, websiteSection.Visibility);
+                    Assert.Equal(Visibility.Visible, domainRulesSection.Visibility);
+
+                    var presetSelector = Assert.IsType<ComboBox>(
+                        window.FindName("DomainPresetSelector"));
+                    var presetNames = presetSelector.Items.Cast<object>()
+                        .Select(item =>
+                            item.GetType().GetProperty("Name")?.GetValue(item) as string ??
+                            string.Empty)
+                        .ToArray();
+                    Assert.Equal(
+                        ["YouTube", "Instagram", "Facebook", "Snapchat", "Discord", "Messenger"],
+                        presetNames);
 
                     var brandLogo = Assert.IsType<Lantern.App.Controls.RedWatcherLogo>(
                         window.FindName("BrandLogo"));
@@ -105,6 +226,16 @@ public sealed class DeviceViewModelTests
                         System.Windows.Media.Color.FromRgb(2, 2, 3),
                         Assert.IsType<System.Windows.Media.SolidColorBrush>(pupil.Fill).Color);
                     Assert.Null(brandLogo.FindName("RedWatcherCatchlight"));
+                    Assert.True(
+                        brandLogo.Width >= 48,
+                        "The in-app brand mark must use enough of its badge to preserve eye detail.");
+                    var irisTexture = Assert.IsType<System.Windows.Shapes.Path>(
+                        brandLogo.FindName("RedWatcherIrisTexture"));
+                    Assert.True(
+                        irisTexture.Data.Bounds.Width >= 55,
+                        "The Red Watcher iris must include visible vector texture rather than a flat dot.");
+                    Assert.IsType<System.Windows.Shapes.Ellipse>(
+                        brandLogo.FindName("RedWatcherInnerIrisRing"));
 
                     var chart = Assert.IsType<Lantern.App.Controls.LiveTrafficChart>(
                         window.FindName("TrafficChart"));
@@ -136,6 +267,74 @@ public sealed class DeviceViewModelTests
                             binding.Delay >= 300,
                             "Limit changes must be debounced so typing 1000 does not apply 1, 10, and 100 first.");
                     }
+
+                    var now = DateTimeOffset.Parse("2026-08-01T12:00:00Z");
+                    DeviceViewModel CreateDevice(
+                        string mac,
+                        string ip,
+                        string name,
+                        double download,
+                        bool isGateway)
+                    {
+                        var snapshot = new DeviceSnapshot(
+                            PhysicalAddress.Parse(mac),
+                            IPAddress.Parse(ip),
+                            name,
+                            now,
+                            now,
+                            download,
+                            0);
+                        var device = new DeviceViewModel(_ => Task.CompletedTask);
+                        device.Initialize(
+                            snapshot,
+                            null,
+                            isGateway,
+                            isGateway ? "Gateway — protected" : "Online");
+                        return device;
+                    }
+
+                    var phoneB = CreateDevice(
+                        "0E4F69CCE4F0",
+                        "192.168.31.213",
+                        "Phone B",
+                        10,
+                        false);
+                    var gateway = CreateDevice(
+                        "64644A380A15",
+                        "192.168.31.1",
+                        "Gateway",
+                        10_000,
+                        true);
+                    var phoneA = CreateDevice(
+                        "D2574CDCA5B2",
+                        "192.168.31.225",
+                        "Phone A",
+                        1_000,
+                        false);
+                    window.Devices.Add(phoneB);
+                    window.Devices.Add(gateway);
+                    window.Devices.Add(phoneA);
+
+                    var deviceView = CollectionViewSource.GetDefaultView(window.Devices);
+                    deviceView.Refresh();
+                    Assert.Equal(
+                        new[] { "Phone A", "Phone B", "Gateway" },
+                        deviceView.Cast<DeviceViewModel>().Select(device => device.DisplayName));
+
+                    phoneB.Update(
+                        new DeviceSnapshot(
+                            PhysicalAddress.Parse("0E4F69CCE4F0"),
+                            IPAddress.Parse("192.168.31.213"),
+                            "Phone B",
+                            now,
+                            now,
+                            50_000,
+                            0),
+                        null);
+                    deviceView.Refresh();
+                    Assert.Equal(
+                        new[] { "Phone A", "Phone B", "Gateway" },
+                        deviceView.Cast<DeviceViewModel>().Select(device => device.DisplayName));
 
                     window.Close();
                 }

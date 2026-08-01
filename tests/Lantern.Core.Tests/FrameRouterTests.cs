@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Text;
 using Lantern.Core.Control;
 using Lantern.Core.Networking;
 
@@ -90,6 +91,77 @@ public sealed class FrameRouterTests
     }
 
     [Fact]
+    public void Route_BlockedDomainDropsOnlyTheMatchingClientsOutboundRequest()
+    {
+        var policy = new TrafficPolicy();
+        policy.SetBlockedDomains(ClientMac.ToString(), ["youtube.com"]);
+        var router = CreateRouter(policy);
+        var frame = BuildDnsQueryFrame("www.youtube.com");
+
+        var result = router.Route(frame);
+
+        Assert.Equal(FrameAction.Drop, result.Action);
+        Assert.Equal(TrafficDirection.Upload, result.Direction);
+        Assert.Equal(ClientMac, result.ClientMac);
+        Assert.Null(result.Frame);
+    }
+
+    [Fact]
+    public void Route_DeviceWithDomainRulesDropsQuicSoAppsFallBackToInspectableTls()
+    {
+        var policy = new TrafficPolicy();
+        policy.SetBlockedDomains(ClientMac.ToString(), ["youtube.com"]);
+        var router = CreateRouter(policy);
+        var frame = BuildUdpIpv4Frame(443, [0xc0, 0x00, 0x00, 0x00]);
+
+        var result = router.Route(frame);
+
+        Assert.Equal(FrameAction.Drop, result.Action);
+        Assert.Equal(TrafficDirection.Upload, result.Direction);
+        Assert.Null(result.Frame);
+    }
+
+    [Fact]
+    public void Route_NewRuleStopsPreviouslyObservedTlsFlowInBothDirections()
+    {
+        var policy = new TrafficPolicy();
+        var router = CreateRouter(policy);
+        var remoteIp = IPAddress.Parse("157.240.0.35");
+        const ushort clientPort = 51000;
+        var clientHello = BuildTcpPayloadFrame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            remoteIp,
+            clientPort,
+            443,
+            BuildTlsClientHello("graph.facebook.com"));
+
+        Assert.Equal(FrameAction.Forward, router.Route(clientHello).Action);
+
+        policy.SetBlockedDomains(ClientMac.ToString(), ["facebook.com"]);
+        var upload = BuildTcpPayloadFrame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            remoteIp,
+            clientPort,
+            443,
+            [0x17, 0x03, 0x03, 0x00, 0x20]);
+        var download = BuildTcpPayloadFrame(
+            LocalMac,
+            GatewayMac,
+            remoteIp,
+            ClientIp,
+            443,
+            clientPort,
+            [0x17, 0x03, 0x03, 0x00, 0x20]);
+
+        Assert.Equal(FrameAction.Drop, router.Route(upload).Action);
+        Assert.Equal(FrameAction.Drop, router.Route(download).Action);
+    }
+
+    [Fact]
     public void Route_LocalComputerTrafficIsIgnored()
     {
         var router = CreateRouter();
@@ -153,5 +225,131 @@ public sealed class FrameRouterTests
             tcpHeaderBytes + applicationPayloadBytes);
         frame[14 + ipv4HeaderBytes + 12] = 0x50;
         return frame;
+    }
+
+    private static byte[] BuildDnsQueryFrame(string domain)
+    {
+        var query = new List<byte>
+        {
+            0x12, 0x34, 0x01, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        };
+        foreach (var label in domain.Split('.'))
+        {
+            query.Add((byte)label.Length);
+            query.AddRange(Encoding.ASCII.GetBytes(label));
+        }
+
+        query.Add(0);
+        query.AddRange([0, 1, 0, 1]);
+        const int udpHeaderBytes = 8;
+        var frame = BuildIpv4Frame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            IPAddress.Parse("1.1.1.1"),
+            udpHeaderBytes + query.Count);
+        frame[23] = 17;
+        var udpOffset = 14 + 20;
+        frame[udpOffset] = 0xcf;
+        frame[udpOffset + 1] = 0x08;
+        frame[udpOffset + 2] = 0;
+        frame[udpOffset + 3] = 53;
+        var udpLength = udpHeaderBytes + query.Count;
+        frame[udpOffset + 4] = (byte)(udpLength >> 8);
+        frame[udpOffset + 5] = (byte)udpLength;
+        query.CopyTo(frame, udpOffset + udpHeaderBytes);
+        return frame;
+    }
+
+    private static byte[] BuildUdpIpv4Frame(ushort destinationPort, byte[] payload)
+    {
+        const int udpHeaderBytes = 8;
+        var frame = BuildIpv4Frame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            IPAddress.Parse("1.1.1.1"),
+            udpHeaderBytes + payload.Length);
+        frame[23] = 17;
+        var udpOffset = 14 + 20;
+        frame[udpOffset] = 0xcf;
+        frame[udpOffset + 1] = 0x08;
+        frame[udpOffset + 2] = (byte)(destinationPort >> 8);
+        frame[udpOffset + 3] = (byte)destinationPort;
+        var udpLength = udpHeaderBytes + payload.Length;
+        frame[udpOffset + 4] = (byte)(udpLength >> 8);
+        frame[udpOffset + 5] = (byte)udpLength;
+        payload.CopyTo(frame, udpOffset + udpHeaderBytes);
+        return frame;
+    }
+
+    private static byte[] BuildTcpPayloadFrame(
+        PhysicalAddress destinationMac,
+        PhysicalAddress sourceMac,
+        IPAddress sourceIp,
+        IPAddress destinationIp,
+        ushort sourcePort,
+        ushort destinationPort,
+        byte[] payload)
+    {
+        const int tcpHeaderBytes = 20;
+        var frame = BuildIpv4Frame(
+            destinationMac,
+            sourceMac,
+            sourceIp,
+            destinationIp,
+            tcpHeaderBytes + payload.Length);
+        var tcpOffset = 14 + 20;
+        frame[tcpOffset] = (byte)(sourcePort >> 8);
+        frame[tcpOffset + 1] = (byte)sourcePort;
+        frame[tcpOffset + 2] = (byte)(destinationPort >> 8);
+        frame[tcpOffset + 3] = (byte)destinationPort;
+        frame[tcpOffset + 12] = 0x50;
+        frame[tcpOffset + 13] = 0x18;
+        payload.CopyTo(frame, tcpOffset + tcpHeaderBytes);
+        return frame;
+    }
+
+    private static byte[] BuildTlsClientHello(string domain)
+    {
+        var host = Encoding.ASCII.GetBytes(domain);
+        var serverName = new List<byte>
+        {
+            0x00, (byte)(host.Length + 3),
+            0x00, 0x00, (byte)host.Length,
+        };
+        serverName.AddRange(host);
+        var extension = new List<byte>
+        {
+            0x00, 0x00,
+            0x00, (byte)serverName.Count,
+        };
+        extension.AddRange(serverName);
+
+        var body = new List<byte> { 0x03, 0x03 };
+        body.AddRange(new byte[32]);
+        body.Add(0);
+        body.AddRange([0, 2, 0x13, 0x01]);
+        body.AddRange([1, 0]);
+        body.AddRange([(byte)(extension.Count >> 8), (byte)extension.Count]);
+        body.AddRange(extension);
+
+        var handshake = new List<byte>
+        {
+            0x01,
+            (byte)(body.Count >> 16),
+            (byte)(body.Count >> 8),
+            (byte)body.Count,
+        };
+        handshake.AddRange(body);
+        var record = new List<byte>
+        {
+            0x16, 0x03, 0x01,
+            (byte)(handshake.Count >> 8),
+            (byte)handshake.Count,
+        };
+        record.AddRange(handshake);
+        return [.. record];
     }
 }

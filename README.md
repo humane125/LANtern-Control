@@ -19,6 +19,8 @@ router dashboard.
 - Refreshes the passive device list every five seconds without sweeping or
   probing every address on the subnet.
 - Shows live download and upload rates for every redirected device.
+- Shows per-device visited domains observed through DNS queries, TLS server names,
+  and plain HTTP host headers without decrypting private HTTPS content.
 - Applies independent download and upload limits in `KB/s`.
 - Pauses a device's IPv4 internet in both directions.
 - Saves rules per MAC address.
@@ -77,6 +79,8 @@ every Wi-Fi:
 - IPv6 traffic is not controlled in this release.
 - Devices behind another router/NAT are not on the same broadcast LAN.
 - Some Wi-Fi adapter drivers do not support raw packet injection.
+- VPNs, Tor, encrypted DNS, QUIC, and TLS Encrypted Client Hello can hide the
+  destination domain from the activity view.
 
 Use this only on networks and devices you own or administer.
 

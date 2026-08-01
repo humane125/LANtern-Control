@@ -14,6 +14,8 @@ public sealed class TrafficPolicy
 {
     private readonly ConcurrentDictionary<string, DeviceLimiters> rules =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string[]> blockedDomains =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<double>? clockSeconds;
 
     public TrafficPolicy(Func<double>? clockSeconds = null)
@@ -48,6 +50,44 @@ public sealed class TrafficPolicy
 
     public void RemoveRule(string macAddress) => rules.TryRemove(NormalizeMac(macAddress), out _);
 
+    public void SetBlockedDomains(string macAddress, IEnumerable<string> domains)
+    {
+        ArgumentNullException.ThrowIfNull(domains);
+        var macKey = NormalizeMac(macAddress);
+        var normalized = domains
+            .Select(domain => TryNormalizeDomain(domain, out var value) ? value : null)
+            .Where(domain => domain is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (normalized.Length == 0)
+        {
+            blockedDomains.TryRemove(macKey, out _);
+            return;
+        }
+
+        blockedDomains[macKey] = normalized;
+    }
+
+    public IReadOnlyList<string> GetBlockedDomains(string macAddress) =>
+        blockedDomains.TryGetValue(NormalizeMac(macAddress), out var domains)
+            ? domains
+            : [];
+
+    public bool ShouldBlockDomain(string macAddress, string domain)
+    {
+        if (!TryNormalizeDomain(domain, out var normalized) ||
+            !blockedDomains.TryGetValue(NormalizeMac(macAddress), out var domains))
+        {
+            return false;
+        }
+
+        return domains.Any(blocked =>
+            normalized.Equals(blocked, StringComparison.OrdinalIgnoreCase) ||
+            normalized.EndsWith($".{blocked}", StringComparison.OrdinalIgnoreCase));
+    }
+
     public bool ShouldForward(string macAddress, TrafficDirection direction, int byteCount)
     {
         if (!rules.TryGetValue(NormalizeMac(macAddress), out var limiters))
@@ -75,6 +115,41 @@ public sealed class TrafficPolicy
         }
 
         return normalized;
+    }
+
+    public static string NormalizeDomain(string value)
+    {
+        if (!TryNormalizeDomain(value, out var normalized))
+        {
+            throw new FormatException("Enter a valid domain such as example.com.");
+        }
+
+        return normalized;
+    }
+
+    private static bool TryNormalizeDomain(string? value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        value = value.Trim().TrimEnd('.').ToLowerInvariant();
+        if (value.StartsWith("*.", StringComparison.Ordinal))
+        {
+            value = value[2..];
+        }
+
+        if (value.Length is 0 or > 253 ||
+            !value.Contains('.', StringComparison.Ordinal) ||
+            Uri.CheckHostName(value) != UriHostNameType.Dns)
+        {
+            return false;
+        }
+
+        normalized = value;
+        return true;
     }
 
     private sealed record DeviceLimiters(

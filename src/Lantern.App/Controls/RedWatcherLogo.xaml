@@ -3,46 +3,80 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="Transparent"
              SnapsToDevicePixels="True">
-    <Viewbox Stretch="Uniform">
+    <Viewbox Stretch="Uniform"
+             StretchDirection="Both"
+             UseLayoutRounding="True">
         <Canvas Width="220" Height="180" Background="Transparent">
-            <Path Data="M25,91 C48,53 75,36 110,36 C145,36 172,53 195,91 C172,128 145,145 110,145 C75,145 48,128 25,91 Z"
+            <Path Data="M18,91 C44,50 75,29 110,29 C145,29 176,50 202,91 C176,132 145,153 110,153 C75,153 44,132 18,91 Z"
                   Fill="#050506"
                   Stroke="{DynamicResource Accent}"
-                  StrokeThickness="7"
+                  StrokeThickness="6"
                   StrokeLineJoin="Round" />
-            <Path Data="M34,91 C54,66 79,54 110,54 C141,54 166,66 186,91 C166,115 141,127 110,127 C79,127 54,115 34,91 Z"
+            <Path Data="M29,91 C51,61 78,46 110,46 C142,46 169,61 191,91 C169,121 142,136 110,136 C78,136 51,121 29,91 Z"
                   Fill="#0A0709"
                   Stroke="#4F111B"
                   StrokeThickness="2" />
-            <Ellipse Canvas.Left="71"
-                     Canvas.Top="52"
-                     Width="78"
-                     Height="78"
+            <Path Data="M31,78 C55,45 79,35 110,35 C141,35 165,45 189,78"
+                  Stroke="#821526"
+                  StrokeThickness="2.3"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round" />
+            <Path Data="M31,104 C55,137 79,147 110,147 C141,147 165,137 189,104"
+                  Stroke="#5B101D"
+                  StrokeThickness="2.3"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round" />
+            <Ellipse Canvas.Left="68"
+                     Canvas.Top="49"
+                     Width="84"
+                     Height="84"
                      Fill="#080608"
                      Stroke="#6F101F"
-                     StrokeThickness="4" />
-            <Ellipse Canvas.Left="80"
-                     Canvas.Top="61"
-                     Width="60"
-                     Height="60">
+                     StrokeThickness="4.5" />
+            <Ellipse Canvas.Left="75"
+                     Canvas.Top="56"
+                     Width="70"
+                     Height="70">
                 <Ellipse.Fill>
                     <RadialGradientBrush Center="0.5,0.48"
                                          GradientOrigin="0.5,0.48"
                                          RadiusX="0.64"
                                          RadiusY="0.64">
-                        <GradientStop Offset="0" Color="#FF4357" />
-                        <GradientStop Offset="0.42" Color="#BD142D" />
+                        <GradientStop Offset="0" Color="#EA2D43" />
+                        <GradientStop Offset="0.48" Color="#A80F27" />
                         <GradientStop Offset="1" Color="#38050E" />
                     </RadialGradientBrush>
                 </Ellipse.Fill>
             </Ellipse>
+            <Path x:Name="RedWatcherIrisTexture"
+                  Data="M129.5,91 L140,91 M127.7,94.1 L137.6,95.9 M126.9,97.2 L137.3,100.9 M126.9,100.8 L134.2,105 M123.8,102.6 L133,110.3 M121.6,104.8 L128,112.4 M119.8,107.9 L124.5,116.1 M116.2,107.9 L119.6,117.3 M113.1,108.7 L115.2,120.5 M110,110.5 L110,119 M106.9,108.7 L105,119.6 M103.8,107.9 L100.4,117.3 M100.3,107.9 L95,117 M98.4,104.8 L92,112.4 M96.2,102.6 L87.8,109.6 M93.1,100.8 L85.8,105 M93.1,97.2 L81.8,101.3 M92.3,94.1 L82.4,95.9 M90.5,91 L81,91 M92.3,87.9 L82.4,86.1 M93.1,84.8 L81.8,80.7 M93.1,81.3 L85.8,77 M96.2,79.4 L87.8,72.4 M98.4,77.2 L92,69.6 M100.2,74.1 L95,65 M103.8,74.1 L100.4,64.7 M106.9,73.3 L105,62.4 M110,71.5 L110,63 M113.1,73.3 L115.2,61.5 M116.2,74.1 L119.6,64.7 M119.7,74.1 L124.5,65.9 M121.6,77.2 L128,69.6 M123.8,79.4 L133,71.7 M126.9,81.3 L134.2,77 M126.9,84.8 L137.3,81.1 M127.7,87.9 L137.6,86.1"
+                  Stroke="#ED4658"
+                  StrokeThickness="2.4"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round"
+                  Opacity="0.82" />
+            <Ellipse x:Name="RedWatcherInnerIrisRing"
+                     Canvas.Left="88"
+                     Canvas.Top="69"
+                     Width="44"
+                     Height="44"
+                     Fill="Transparent"
+                     Stroke="#6E0A1A"
+                     StrokeThickness="2" />
             <Ellipse x:Name="RedWatcherPupil"
-                     Canvas.Left="93"
-                     Canvas.Top="74"
-                     Width="34"
-                     Height="34"
+                     Canvas.Left="92"
+                     Canvas.Top="73"
+                     Width="36"
+                     Height="36"
                      Fill="#020203" />
-            <Path Data="M29,91 H47 M173,91 H191"
+            <Ellipse Canvas.Left="99"
+                     Canvas.Top="80"
+                     Width="22"
+                     Height="22"
+                     Fill="#050405"
+                     Stroke="#19060A"
+                     StrokeThickness="1" />
+            <Path Data="M22,91 H46 M174,91 H198"
                   Stroke="#7E0E1E"
                   StrokeThickness="3" />
         </Canvas>

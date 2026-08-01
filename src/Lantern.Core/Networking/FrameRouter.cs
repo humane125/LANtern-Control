@@ -17,15 +17,19 @@ public sealed record FrameRouteResult(
     TrafficDirection? Direction = null,
     PhysicalAddress? ClientMac = null,
     byte[]? Frame = null,
-    int MeteredByteCount = 0);
+    int MeteredByteCount = 0,
+    DomainObservation? Observation = null,
+    bool BlockedByDomain = false);
 
 public sealed class FrameRouter
 {
+    private const int MaxObservedFlows = 8192;
     private readonly PhysicalAddress localMac;
     private readonly IPAddress localIp;
     private readonly PhysicalAddress gatewayMac;
     private readonly TrafficPolicy policy;
     private readonly ConcurrentDictionary<IPAddress, PhysicalAddress> clients;
+    private readonly ConcurrentDictionary<ObservedFlowKey, string> observedFlowDomains = [];
 
     public FrameRouter(
         PhysicalAddress localMac,
@@ -58,6 +62,11 @@ public sealed class FrameRouter
             return new FrameRouteResult(FrameAction.Ignore);
         }
 
+        TransportFlow? transportFlow =
+            NetworkActivityParser.TryParseTransportFlow(frame, out var parsedFlow)
+                ? parsedFlow
+                : null;
+
         if (ipv4.Source.Equals(localIp) || ipv4.Destination.Equals(localIp))
         {
             return new FrameRouteResult(FrameAction.Ignore);
@@ -67,12 +76,18 @@ public sealed class FrameRouter
             clients.TryGetValue(ipv4.Source, out var uploadClientMac) &&
             ipv4.SourceMac.Equals(uploadClientMac))
         {
+            DomainObservation? observation =
+                NetworkActivityParser.TryParseOutbound(frame, out var parsed)
+                    ? parsed
+                    : null;
             return RouteForClient(
                 frame,
                 uploadClientMac,
                 TrafficDirection.Upload,
                 gatewayMac,
-                ipv4.TransportPayloadLength);
+                ipv4.TransportPayloadLength,
+                observation,
+                transportFlow);
         }
 
         if (ipv4.DestinationMac.Equals(localMac) &&
@@ -84,7 +99,9 @@ public sealed class FrameRouter
                 downloadClientMac,
                 TrafficDirection.Download,
                 downloadClientMac,
-                ipv4.TransportPayloadLength);
+                ipv4.TransportPayloadLength,
+                null,
+                transportFlow);
         }
 
         return new FrameRouteResult(FrameAction.Ignore);
@@ -95,11 +112,67 @@ public sealed class FrameRouter
         PhysicalAddress clientMac,
         TrafficDirection direction,
         PhysicalAddress destinationMac,
-        int meteredByteCount)
+        int meteredByteCount,
+        DomainObservation? observation,
+        TransportFlow? transportFlow)
     {
+        ObservedFlowKey? flowKey = transportFlow is { } flow
+            ? CreateFlowKey(clientMac, direction, flow)
+            : null;
+        if (direction == TrafficDirection.Upload &&
+            observation is { Source: not DomainObservationSource.Dns } observedDomain &&
+            flowKey is { } observedKey)
+        {
+            if (observedFlowDomains.Count >= MaxObservedFlows)
+            {
+                observedFlowDomains.Clear();
+            }
+
+            observedFlowDomains[observedKey] = observedDomain.Domain;
+        }
+
+        if (flowKey is { } knownKey &&
+            observedFlowDomains.TryGetValue(knownKey, out var knownDomain) &&
+            policy.ShouldBlockDomain(clientMac.ToString(), knownDomain))
+        {
+            return new FrameRouteResult(
+                FrameAction.Drop,
+                direction,
+                clientMac,
+                Observation: observation,
+                BlockedByDomain: true);
+        }
+
+        if (direction == TrafficDirection.Upload &&
+            policy.GetBlockedDomains(clientMac.ToString()).Count > 0 &&
+            NetworkActivityParser.IsOutboundUdpToPort(frame, 443))
+        {
+            return new FrameRouteResult(
+                FrameAction.Drop,
+                direction,
+                clientMac,
+                BlockedByDomain: true);
+        }
+
+        if (direction == TrafficDirection.Upload &&
+            observation is { } outbound &&
+            policy.ShouldBlockDomain(clientMac.ToString(), outbound.Domain))
+        {
+            return new FrameRouteResult(
+                FrameAction.Drop,
+                direction,
+                clientMac,
+                Observation: outbound,
+                BlockedByDomain: true);
+        }
+
         if (!policy.ShouldForward(clientMac.ToString(), direction, frame.Length))
         {
-            return new FrameRouteResult(FrameAction.Drop, direction, clientMac);
+            return new FrameRouteResult(
+                FrameAction.Drop,
+                direction,
+                clientMac,
+                Observation: observation);
         }
 
         return new FrameRouteResult(
@@ -110,6 +183,32 @@ public sealed class FrameRouter
                 frame,
                 localMac,
                 destinationMac),
-            meteredByteCount);
+            meteredByteCount,
+            observation);
     }
+
+    private static ObservedFlowKey CreateFlowKey(
+        PhysicalAddress clientMac,
+        TrafficDirection direction,
+        TransportFlow flow) =>
+        direction == TrafficDirection.Upload
+            ? new ObservedFlowKey(
+                TrafficPolicy.NormalizeMac(clientMac.ToString()),
+                flow.SourcePort,
+                flow.DestinationAddress,
+                flow.DestinationPort,
+                flow.Protocol)
+            : new ObservedFlowKey(
+                TrafficPolicy.NormalizeMac(clientMac.ToString()),
+                flow.DestinationPort,
+                flow.SourceAddress,
+                flow.SourcePort,
+                flow.Protocol);
+
+    private readonly record struct ObservedFlowKey(
+        string ClientMac,
+        ushort ClientPort,
+        IPAddress RemoteAddress,
+        ushort RemotePort,
+        byte Protocol);
 }

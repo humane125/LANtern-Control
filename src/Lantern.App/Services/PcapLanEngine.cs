@@ -62,6 +62,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
     public event EventHandler<DeviceIdentityLearnedEventArgs>? DeviceIdentityLearned;
 
+    public event EventHandler<DeviceDomainObservedEventArgs>? DeviceDomainObserved;
+
     public void ReplaceKnownDeviceHints(IEnumerable<KnownDeviceHint> hints)
     {
         ArgumentNullException.ThrowIfNull(hints);
@@ -525,6 +527,19 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 result.ClientMac,
                 result.Direction.Value,
                 result.MeteredByteCount);
+        }
+
+        if (result.Direction == TrafficDirection.Upload &&
+            result.ClientMac is not null &&
+            result.Observation is { } observation)
+        {
+            DeviceDomainObserved?.Invoke(
+                this,
+                new DeviceDomainObservedEventArgs(
+                    result.ClientMac,
+                    observation,
+                    DateTimeOffset.UtcNow,
+                    result.BlockedByDomain));
         }
 
         if (result.Action == FrameAction.Forward && result.Frame is not null)

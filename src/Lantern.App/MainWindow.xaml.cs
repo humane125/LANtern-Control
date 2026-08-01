@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,6 +22,11 @@ namespace Lantern.App;
 
 public partial class MainWindow : Window
 {
+    private const int MaxWebsiteActivityRows = 250;
+    private static readonly HttpClient UpdateHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(5),
+    };
     private readonly DeviceRegistry registry = new();
     private readonly TrafficPolicy policy = new();
     private readonly SettingsStore settingsStore = new();
@@ -27,7 +34,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer refreshTimer;
     private readonly Dictionary<string, DeviceViewModel> deviceIndex =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DeviceActivityViewModel> websiteActivityIndex =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DeviceActivityGroupViewModel> websiteActivityGroupIndex =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly TrafficHistory trafficHistory = new(TrafficSamplingProfile.Capacity, TrafficSamplingProfile.Retention);
+    private readonly GitHubUpdateChecker updateChecker = new(UpdateHttpClient);
     private PcapLanEngine engine;
     private AppSettings settings = new();
     private DateTimeOffset? controlStartedAt;
@@ -39,23 +51,52 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = this;
+        DomainPresetSelector.ItemsSource = DomainPresets;
         engine = new PcapLanEngine(registry, policy);
         engine.StatusChanged += Engine_OnStatusChanged;
         engine.DeviceIdentityLearned += Engine_OnDeviceIdentityLearned;
+        engine.DeviceDomainObserved += Engine_OnDeviceDomainObserved;
         refreshTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, RefreshDevices, Dispatcher);
         Loaded += MainWindow_OnLoaded;
         Closing += MainWindow_OnClosing;
 
         var view = CollectionViewSource.GetDefaultView(Devices);
         view.SortDescriptions.Add(
-            new SortDescription(nameof(DeviceViewModel.TotalRate), ListSortDirection.Descending));
+            new SortDescription(nameof(DeviceViewModel.IsProtected), ListSortDirection.Ascending));
+        view.SortDescriptions.Add(
+            new SortDescription(nameof(DeviceViewModel.DisplayName), ListSortDirection.Ascending));
+
+        var activityView = CollectionViewSource.GetDefaultView(WebsiteActivity);
+        activityView.SortDescriptions.Add(
+            new SortDescription(nameof(DeviceActivityViewModel.LastSeen), ListSortDirection.Descending));
+
+        var groupView = CollectionViewSource.GetDefaultView(DeviceActivityGroups);
+        groupView.SortDescriptions.Add(
+            new SortDescription(nameof(DeviceActivityGroupViewModel.DeviceName), ListSortDirection.Ascending));
+
+        var domainRuleView = CollectionViewSource.GetDefaultView(DomainRules);
+        domainRuleView.SortDescriptions.Add(
+            new SortDescription(nameof(DomainRuleViewModel.DeviceName), ListSortDirection.Ascending));
+        domainRuleView.SortDescriptions.Add(
+            new SortDescription(nameof(DomainRuleViewModel.Domain), ListSortDirection.Ascending));
     }
 
     public ObservableCollection<DeviceViewModel> Devices { get; } = [];
 
+    public ObservableCollection<DeviceActivityViewModel> WebsiteActivity { get; } = [];
+
+    public ObservableCollection<DeviceActivityGroupViewModel> DeviceActivityGroups { get; } = [];
+
+    public ObservableCollection<DeviceViewModel> DomainRuleDevices { get; } = [];
+
+    public ObservableCollection<DomainRuleViewModel> DomainRules { get; } = [];
+
+    public IReadOnlyList<DomainBlockPreset> DomainPresets => DomainBlockPresetCatalog.All;
+
     private async void MainWindow_OnLoaded(object sender, RoutedEventArgs eventArgs)
     {
         settings = await settingsStore.LoadAsync();
+        LoadDomainRulesFromSettings();
         var adapters = WindowsAdapterService.GetUsableAdapters();
         AdapterSelector.ItemsSource = adapters;
         AdapterSelector.SelectedIndex = adapters.Count > 0 ? 0 : -1;
@@ -64,6 +105,58 @@ public partial class MainWindow : Window
         {
             SetStatus("No active IPv4 adapter with a gateway was found.", false);
             StartButton.IsEnabled = false;
+        }
+
+        await CheckForUpdatesAsync();
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        var checkedAt = DateTimeOffset.UtcNow;
+        if (!GitHubUpdateChecker.ShouldCheck(
+                settings.DisableUpdateChecks,
+                settings.LastUpdateCheckUtc,
+                checkedAt))
+        {
+            return;
+        }
+
+        settings.LastUpdateCheckUtc = checkedAt;
+        try
+        {
+            var installedVersion = typeof(MainWindow).Assembly.GetName().Version ?? new Version();
+            var available = await updateChecker.CheckAsync(installedVersion);
+            await settingsStore.SaveAsync(settings);
+            settingsDirty = false;
+            if (available is null)
+            {
+                return;
+            }
+
+            var prompt = new UpdatePromptWindow(installedVersion, available.LatestVersion)
+            {
+                Owner = this,
+            };
+            prompt.ShowDialog();
+            if (prompt.Choice == UpdatePromptChoice.NeverAskAgain)
+            {
+                settings.DisableUpdateChecks = true;
+                await settingsStore.SaveAsync(settings);
+                settingsDirty = false;
+                return;
+            }
+
+            if (prompt.Choice == UpdatePromptChoice.Update)
+            {
+                Process.Start(new ProcessStartInfo(available.ReleasePage.AbsoluteUri)
+                {
+                    UseShellExecute = true,
+                });
+            }
+        }
+        catch (Exception)
+        {
+            // Update checks are optional and must never interrupt app startup.
         }
     }
 
@@ -138,6 +231,401 @@ public partial class MainWindow : Window
             operationInProgress = false;
             UpdateButtons();
         }
+    }
+
+    private void ClearActivityButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        websiteActivityIndex.Clear();
+        WebsiteActivity.Clear();
+        foreach (var group in websiteActivityGroupIndex.Values)
+        {
+            group.ClearDomains();
+        }
+
+        RefreshWebsiteActivityState();
+        DetailStatusText.Text = "Website activity cleared from this session.";
+    }
+
+    private void Engine_OnDeviceDomainObserved(
+        object? sender,
+        DeviceDomainObservedEventArgs eventArgs)
+    {
+        _ = Dispatcher.BeginInvoke(
+            () => ObserveWebsiteActivity(eventArgs),
+            DispatcherPriority.Background);
+    }
+
+    private void ObserveWebsiteActivity(DeviceDomainObservedEventArgs eventArgs)
+    {
+        var macKey = TrafficPolicy.NormalizeMac(eventArgs.MacAddress.ToString());
+        var deviceName = deviceIndex.TryGetValue(macKey, out var device)
+            ? device.DisplayName
+            : $"Device {FormatMac(macKey)}";
+        var ipAddress = device?.IpAddress ?? "-";
+        var group = GetOrCreateWebsiteActivityGroup(macKey, deviceName, ipAddress);
+        var domainKey = $"{macKey}|{eventArgs.Observation.Domain}";
+        if (websiteActivityIndex.TryGetValue(domainKey, out var existing))
+        {
+            existing.Observe(
+                deviceName,
+                ipAddress,
+                eventArgs.Observation.Source,
+                eventArgs.ObservedAt);
+            existing.SetBlocked(
+                eventArgs.Blocked || policy.ShouldBlockDomain(macKey, existing.Domain));
+            group.TouchDomain(existing);
+        }
+        else
+        {
+            var activity = new DeviceActivityViewModel(
+                macKey,
+                deviceName,
+                ipAddress,
+                eventArgs.Observation.Domain,
+                eventArgs.Observation.Source,
+                eventArgs.ObservedAt);
+            activity.SetBlocked(
+                eventArgs.Blocked || policy.ShouldBlockDomain(macKey, activity.Domain));
+            websiteActivityIndex[domainKey] = activity;
+            WebsiteActivity.Add(activity);
+            group.AddDomain(activity);
+        }
+
+        while (WebsiteActivity.Count > MaxWebsiteActivityRows)
+        {
+            var oldest = WebsiteActivity.MinBy(activity => activity.LastSeen);
+            if (oldest is null)
+            {
+                break;
+            }
+
+            WebsiteActivity.Remove(oldest);
+            websiteActivityIndex.Remove($"{oldest.MacKey}|{oldest.Domain}");
+            if (websiteActivityGroupIndex.TryGetValue(oldest.MacKey, out var oldestGroup))
+            {
+                oldestGroup.RemoveDomain(oldest);
+            }
+        }
+
+        CollectionViewSource.GetDefaultView(WebsiteActivity).Refresh();
+        RefreshWebsiteActivityState();
+    }
+
+    private async void BlockVisitedDomainButton_OnClick(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        if (sender is Button { Tag: DeviceActivityViewModel activity })
+        {
+            await AddDomainBlockAsync(activity.MacKey, activity.Domain);
+        }
+    }
+
+    private async void AddDomainRuleButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (DomainRuleDeviceSelector.SelectedItem is not DeviceViewModel { CanControl: true } device)
+        {
+            DomainRuleValidationText.Text = "Choose a connected device.";
+            DomainRuleValidationText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        string domain;
+        try
+        {
+            domain = TrafficPolicy.NormalizeDomain(DomainRuleInput.Text);
+        }
+        catch (FormatException exception)
+        {
+            DomainRuleValidationText.Text = exception.Message;
+            DomainRuleValidationText.Visibility = Visibility.Visible;
+            DomainRuleInput.Focus();
+            return;
+        }
+
+        DomainRuleValidationText.Visibility = Visibility.Collapsed;
+        await AddDomainBlockAsync(device.MacKey, domain);
+        DomainRuleInput.Clear();
+    }
+
+    private async void ApplyDomainPresetButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (DomainPresetDeviceSelector.SelectedItem is not DeviceViewModel { CanControl: true } device)
+        {
+            DomainPresetValidationText.Text = "Choose a connected device.";
+            DomainPresetValidationText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        if (DomainPresetSelector.SelectedItem is not DomainBlockPreset preset)
+        {
+            DomainPresetValidationText.Text = "Choose an app preset.";
+            DomainPresetValidationText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        DomainPresetValidationText.Visibility = Visibility.Collapsed;
+        await AddDomainBlocksAsync(
+            device.MacKey,
+            preset.Domains,
+            $"Applied the {preset.Name} preset to {device.DisplayName}. " +
+            "Reconnect the app so existing sessions close.");
+    }
+
+    private async void RemoveDomainRuleButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is Button { Tag: DomainRuleViewModel rule })
+        {
+            await RemoveDomainBlockAsync(rule);
+        }
+    }
+
+    private async Task AddDomainBlockAsync(string macAddress, string domain)
+    {
+        var normalizedDomain = TrafficPolicy.NormalizeDomain(domain);
+        await AddDomainBlocksAsync(
+            macAddress,
+            [normalizedDomain],
+            $"Blocked {normalizedDomain} for {ResolveDeviceName(TrafficPolicy.NormalizeMac(macAddress))}. " +
+            "New connections are filtered immediately.");
+    }
+
+    private async Task AddDomainBlocksAsync(
+        string macAddress,
+        IEnumerable<string> requestedDomains,
+        string status)
+    {
+        var macKey = TrafficPolicy.NormalizeMac(macAddress);
+        if (!settings.BlockedDomains.TryGetValue(macKey, out var domains))
+        {
+            domains = [];
+            settings.BlockedDomains[macKey] = domains;
+        }
+
+        foreach (var requested in requestedDomains)
+        {
+            var normalized = TrafficPolicy.NormalizeDomain(requested);
+            if (!domains.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+            {
+                domains.Add(normalized);
+            }
+        }
+
+        domains.Sort(StringComparer.OrdinalIgnoreCase);
+        policy.SetBlockedDomains(macKey, domains);
+        foreach (var domain in domains)
+        {
+            UpsertDomainRule(macKey, domain);
+        }
+
+        RefreshBlockedActivityState();
+        await SaveDomainRulesAsync(status);
+    }
+
+    private async Task RemoveDomainBlockAsync(DomainRuleViewModel rule)
+    {
+        if (settings.BlockedDomains.TryGetValue(rule.MacKey, out var domains))
+        {
+            domains.RemoveAll(domain =>
+                domain.Equals(rule.Domain, StringComparison.OrdinalIgnoreCase));
+            if (domains.Count == 0)
+            {
+                settings.BlockedDomains.Remove(rule.MacKey);
+            }
+        }
+
+        policy.SetBlockedDomains(
+            rule.MacKey,
+            settings.BlockedDomains.TryGetValue(rule.MacKey, out var remaining)
+                ? remaining
+                : []);
+        DomainRules.Remove(rule);
+        RefreshBlockedActivityState();
+        await SaveDomainRulesAsync($"Unblocked {rule.Domain} for {rule.DeviceName}.");
+    }
+
+    private async Task SaveDomainRulesAsync(string status)
+    {
+        try
+        {
+            await settingsStore.SaveAsync(settings);
+            settingsDirty = false;
+            RefreshDomainRulesState();
+            DetailStatusText.Text = status;
+        }
+        catch (IOException exception)
+        {
+            DetailStatusText.Text = exception.Message;
+        }
+    }
+
+    private void LoadDomainRulesFromSettings()
+    {
+        DomainRules.Clear();
+        foreach (var pair in settings.BlockedDomains)
+        {
+            policy.SetBlockedDomains(pair.Key, pair.Value);
+            foreach (var domain in pair.Value)
+            {
+                UpsertDomainRule(pair.Key, domain);
+            }
+        }
+
+        RefreshBlockedActivityState();
+        RefreshDomainRulesState();
+    }
+
+    private void UpsertDomainRule(string macKey, string domain)
+    {
+        var existing = DomainRules.FirstOrDefault(rule =>
+            rule.MacKey.Equals(macKey, StringComparison.OrdinalIgnoreCase) &&
+            rule.Domain.Equals(domain, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            existing.UpdateDeviceName(ResolveDeviceName(macKey));
+            return;
+        }
+
+        DomainRules.Add(new DomainRuleViewModel(
+            macKey,
+            ResolveDeviceName(macKey),
+            domain));
+    }
+
+    private string ResolveDeviceName(string macKey)
+    {
+        if (deviceIndex.TryGetValue(macKey, out var device))
+        {
+            return device.DisplayName;
+        }
+
+        if (settings.Devices.TryGetValue(macKey, out var preferences))
+        {
+            if (!string.IsNullOrWhiteSpace(preferences.Alias))
+            {
+                return preferences.Alias;
+            }
+
+            if (!string.IsNullOrWhiteSpace(preferences.LearnedHostName))
+            {
+                return preferences.LearnedHostName;
+            }
+        }
+
+        return $"Device {FormatMac(macKey)}";
+    }
+
+    private void RefreshBlockedActivityState()
+    {
+        foreach (var activity in WebsiteActivity)
+        {
+            activity.SetBlocked(policy.ShouldBlockDomain(activity.MacKey, activity.Domain));
+        }
+    }
+
+    private void RefreshDomainRulesState()
+    {
+        DomainRulesEmptyState.Visibility = DomainRules.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        DomainRuleCountText.Text =
+            $"{DomainRules.Count} rule{(DomainRules.Count == 1 ? string.Empty : "s")}";
+        CollectionViewSource.GetDefaultView(DomainRules).Refresh();
+    }
+
+    private void RefreshWebsiteActivityState()
+    {
+        WebsiteActivityEmptyState.Visibility = DeviceActivityGroups.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        WebsiteActivityCountText.Text =
+            $"{DeviceActivityGroups.Count} device{(DeviceActivityGroups.Count == 1 ? string.Empty : "s")}  •  " +
+            $"{WebsiteActivity.Count} domain{(WebsiteActivity.Count == 1 ? string.Empty : "s")}";
+    }
+
+    private DeviceActivityGroupViewModel GetOrCreateWebsiteActivityGroup(
+        string macKey,
+        string deviceName,
+        string ipAddress)
+    {
+        if (!websiteActivityGroupIndex.TryGetValue(macKey, out var group))
+        {
+            group = new DeviceActivityGroupViewModel(macKey, deviceName, ipAddress);
+            websiteActivityGroupIndex[macKey] = group;
+        }
+        else
+        {
+            group.UpdateIdentity(deviceName, ipAddress);
+        }
+
+        if (!DeviceActivityGroups.Contains(group))
+        {
+            DeviceActivityGroups.Add(group);
+        }
+
+        return group;
+    }
+
+    private void SyncWebsiteActivityGroups()
+    {
+        var connectedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var device in Devices.Where(device => device.CanControl && device.IsOnline))
+        {
+            connectedKeys.Add(device.MacKey);
+            _ = GetOrCreateWebsiteActivityGroup(
+                device.MacKey,
+                device.DisplayName,
+                device.IpAddress);
+        }
+
+        foreach (var group in DeviceActivityGroups
+                     .Where(group => !connectedKeys.Contains(group.MacKey))
+                     .ToArray())
+        {
+            DeviceActivityGroups.Remove(group);
+        }
+
+        RefreshWebsiteActivityState();
+    }
+
+    private void SyncDomainRuleDevices()
+    {
+        var available = Devices
+            .Where(device => device.CanControl && device.IsOnline)
+            .ToArray();
+        foreach (var stale in DomainRuleDevices
+                     .Where(device => !available.Contains(device))
+                     .ToArray())
+        {
+            DomainRuleDevices.Remove(stale);
+        }
+
+        foreach (var device in available)
+        {
+            if (!DomainRuleDevices.Contains(device))
+            {
+                DomainRuleDevices.Add(device);
+            }
+
+            foreach (var rule in DomainRules.Where(rule =>
+                         rule.MacKey.Equals(device.MacKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                rule.UpdateDeviceName(device.DisplayName);
+            }
+        }
+
+        if (DomainRuleDeviceSelector.SelectedItem is null && DomainRuleDevices.Count > 0)
+        {
+            DomainRuleDeviceSelector.SelectedIndex = 0;
+        }
+
+        if (DomainPresetDeviceSelector.SelectedItem is null && DomainRuleDevices.Count > 0)
+        {
+            DomainPresetDeviceSelector.SelectedIndex = 0;
+        }
+
+        CollectionViewSource.GetDefaultView(DomainRuleDevices).Refresh();
+        CollectionViewSource.GetDefaultView(DomainRules).Refresh();
     }
 
     private void AdapterSelector_OnSelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
@@ -256,6 +744,8 @@ public partial class MainWindow : Window
             view.Refresh();
         }
 
+        SyncWebsiteActivityGroups();
+        SyncDomainRuleDevices();
         RefreshDashboardSummary();
         EmptyState.Visibility = Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DeviceCountText.Text = $"{Devices.Count} device{(Devices.Count == 1 ? string.Empty : "s")}";
@@ -328,6 +818,11 @@ public partial class MainWindow : Window
                     pair.Value.DownloadKiloBytesPerSecond,
                     pair.Value.UploadKiloBytesPerSecond)
                     .ForForwardingMode());
+        }
+
+        foreach (var pair in settings.BlockedDomains)
+        {
+            policy.SetBlockedDomains(pair.Key, pair.Value);
         }
     }
 
@@ -459,6 +954,23 @@ public partial class MainWindow : Window
         StopButton.Visibility = engine.IsRunning ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private void MinimizeWindowButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void MaximizeWindowButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+    }
+
+    private void CloseWindowButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        Close();
+    }
+
     private void NavigationButton_OnClick(object sender, RoutedEventArgs eventArgs)
     {
         if (sender is not Button { Tag: string targetName } ||
@@ -467,11 +979,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        target.BringIntoView();
+        SetVisiblePage(target);
+        MainScrollViewer.ScrollToTop();
+        if (target == OverviewSection)
+        {
+            target.BringIntoView();
+        }
+
         if (target == AdapterStrip)
         {
             AdapterSelector.Focus();
         }
+    }
+
+    private void SetVisiblePage(FrameworkElement target)
+    {
+        var showOverview = target == OverviewSection;
+        var overviewVisibility = showOverview ? Visibility.Visible : Visibility.Collapsed;
+        OverviewSection.Visibility = overviewVisibility;
+        AdapterStrip.Visibility = overviewVisibility;
+        MetricsPanel.Visibility = overviewVisibility;
+        ActivitySection.Visibility = overviewVisibility;
+        DeviceSection.Visibility = overviewVisibility;
+        WebsiteActivitySection.Visibility = target == WebsiteActivitySection
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        DomainRulesSection.Visibility = target == DomainRulesSection
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void UpdateAdapterSummary()
@@ -520,6 +1055,11 @@ public partial class MainWindow : Window
             UptimeText.Text = $"Active {elapsed:hh\\:mm\\:ss}";
         }
     }
+
+    private static string FormatMac(string macKey) =>
+        string.Join(
+            ":",
+            Enumerable.Range(0, 6).Select(index => macKey.Substring(index * 2, 2)));
 
     private void SetStatus(string message, bool? active)
     {
