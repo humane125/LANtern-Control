@@ -8,7 +8,7 @@ if ([string]::IsNullOrWhiteSpace($ScriptPath)) {
     $ScriptPath = Join-Path $PSScriptRoot "..\installer\LanternControl.iss"
 }
 
-$content = Get-Content -LiteralPath $ScriptPath -Raw
+$content = (Get-Content -LiteralPath $ScriptPath -Raw) -replace "`r`n", "`n"
 $requirements = [ordered]@{
     "installation directory page" = '(?m)^DisableDirPage=no$'
     "shortcut task section" = '(?m)^\[Tasks\]$'
