@@ -664,7 +664,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBox x:Name="LimitEditor"
                                                                  Style="{StaticResource CompactLimitTextBoxStyle}"
-                                                                 ToolTip="0 means unlimited"
+                                                                  ToolTip="0 keeps the normal router mapping; a positive limit enables two-way interception"
                                                                  Text="{Binding DownloadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}" />
                                                         <Border Grid.Column="1"
                                                                 Margin="0,7"
@@ -695,7 +695,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBox x:Name="LimitEditor"
                                                                  Style="{StaticResource CompactLimitTextBoxStyle}"
-                                                                 ToolTip="0 means unlimited"
+                                                                  ToolTip="0 means unlimited; upload-only rules use stealth interception"
                                                                  Text="{Binding UploadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}" />
                                                         <Border Grid.Column="1"
                                                                 Margin="0,7"
@@ -721,7 +721,7 @@
                                                           Content="Paused"
                                                           IsEnabled="{Binding CanControl}"
                                                           IsChecked="{Binding PauseInternet, UpdateSourceTrigger=PropertyChanged}"
-                                                          ToolTip="Pause this device while control is active" />
+                                                          ToolTip="Pause this device with client-side stealth interception" />
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>

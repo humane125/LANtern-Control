@@ -59,28 +59,22 @@ public sealed class TrafficControlTests
     }
 
     [Fact]
-    public void TrafficPolicy_AllObservedDevicesRequireTwoSidedInterception()
+    public void TrafficPolicy_UnlimitedDevicesDoNotRequireInterception()
     {
         var policy = new TrafficPolicy();
         policy.SetRule("00:11:22:33:44:01", new TrafficRule(false, 0, 0));
-        policy.SetRule("00:11:22:33:44:02", new TrafficRule(false, 100, 0));
-        policy.SetRule("00:11:22:33:44:03", new TrafficRule(false, 0, 50));
-        policy.SetRule("00:11:22:33:44:04", new TrafficRule(true, 0, 0));
 
-        Assert.True(policy.RequiresInterception("00:11:22:33:44:01"));
-        Assert.True(policy.RequiresInterception("00:11:22:33:44:02"));
-        Assert.True(policy.RequiresInterception("00:11:22:33:44:03"));
-        Assert.True(policy.RequiresInterception("00:11:22:33:44:04"));
-        Assert.True(policy.RequiresInterception("00:11:22:33:44:05"));
+        Assert.False(policy.RequiresInterception("00:11:22:33:44:01"));
+        Assert.False(policy.RequiresInterception("00:11:22:33:44:05"));
     }
 
     [Theory]
-    [InlineData(false, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
-    [InlineData(true, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
-    [InlineData(false, 0, 50, InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    [InlineData(false, 0, 0, InterceptionTargets.None)]
+    [InlineData(true, 0, 0, InterceptionTargets.Client)]
+    [InlineData(false, 0, 50, InterceptionTargets.Client)]
     [InlineData(false, 100, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
     [InlineData(false, 100, 50, InterceptionTargets.Client | InterceptionTargets.Gateway)]
-    public void TrafficPolicy_ActiveRulesRedirectBothPeers(
+    public void TrafficPolicy_RedirectsOnlyThePeersRequiredByTheRule(
         bool pause,
         int downloadLimit,
         int uploadLimit,
@@ -91,6 +85,34 @@ public sealed class TrafficControlTests
         policy.SetRule(mac, new TrafficRule(pause, downloadLimit, uploadLimit));
 
         Assert.Equal(expected, policy.GetInterceptionTargets(mac));
+    }
+
+    [Theory]
+    [InlineData(
+        InterceptionTargets.Client | InterceptionTargets.Gateway,
+        InterceptionTargets.Client,
+        InterceptionTargets.Gateway,
+        InterceptionTargets.Client)]
+    [InlineData(
+        InterceptionTargets.Client,
+        InterceptionTargets.None,
+        InterceptionTargets.Client,
+        InterceptionTargets.None)]
+    [InlineData(
+        InterceptionTargets.None,
+        InterceptionTargets.Client | InterceptionTargets.Gateway,
+        InterceptionTargets.None,
+        InterceptionTargets.Client | InterceptionTargets.Gateway)]
+    public void InterceptionTransition_RestoresRemovedPeersAndPoisonsCurrentPeers(
+        InterceptionTargets previous,
+        InterceptionTargets current,
+        InterceptionTargets expectedRestore,
+        InterceptionTargets expectedPoison)
+    {
+        var transition = InterceptionTransition.Between(previous, current);
+
+        Assert.Equal(expectedRestore, transition.Restore);
+        Assert.Equal(expectedPoison, transition.Poison);
     }
 
     [Fact]
