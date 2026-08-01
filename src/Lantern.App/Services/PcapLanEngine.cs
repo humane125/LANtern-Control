@@ -566,16 +566,35 @@ public sealed class PcapLanEngine : IAsyncDisposable
             return;
         }
 
+        var dnsTask = ResolveDnsNameAsync(address);
+        var netBiosTask = NetBiosNameResolver.ResolveAsync(address);
+        var pending = new List<Task<string?>> { dnsTask, netBiosTask };
+        while (pending.Count > 0)
+        {
+            var completed = await Task.WhenAny(pending);
+            pending.Remove(completed);
+            var name = await completed;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                registry.SetHostName(mac, name);
+                return;
+            }
+        }
+    }
+
+    private static async Task<string?> ResolveDnsNameAsync(IPAddress address)
+    {
         try
         {
             var entry = await Dns.GetHostEntryAsync(address)
                 .WaitAsync(TimeSpan.FromSeconds(2));
-            var name = entry.HostName.Split('.')[0];
-            registry.SetHostName(mac, name);
+            var name = entry.HostName.Split('.')[0].Trim();
+            return name.Length == 0 || IPAddress.TryParse(name, out _) ? null : name;
         }
         catch (Exception exception) when (
             exception is System.Net.Sockets.SocketException or TimeoutException)
         {
+            return null;
         }
     }
 

@@ -618,8 +618,16 @@
                                                               Stretch="Uniform" />
                                                     </Border>
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding DisplayName}"
-                                                                   FontWeight="SemiBold" />
+                                                        <TextBox Padding="0"
+                                                                 Background="Transparent"
+                                                                 BorderThickness="0"
+                                                                 CaretBrush="{StaticResource Accent}"
+                                                                 FocusVisualStyle="{x:Null}"
+                                                                 FontWeight="SemiBold"
+                                                                 Foreground="{StaticResource PrimaryText}"
+                                                                 IsEnabled="{Binding CanControl}"
+                                                                 Text="{Binding EditableName, UpdateSourceTrigger=PropertyChanged, Delay=350}"
+                                                                 ToolTip="Click to rename this device" />
                                                         <StackPanel Margin="0,2,0,0" Orientation="Horizontal">
                                                             <TextBlock Text="{Binding MacAddress}"
                                                                        Foreground="{StaticResource SecondaryText}"

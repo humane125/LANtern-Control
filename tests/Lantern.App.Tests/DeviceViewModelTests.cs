@@ -200,6 +200,35 @@ public sealed class DeviceViewModelTests
     }
 
     [Fact]
+    public void EditableName_SavesManualAliasAndOverridesAutomaticNames()
+    {
+        var now = DateTimeOffset.Parse("2026-07-31T00:00:00Z");
+        var snapshot = new DeviceSnapshot(
+            PhysicalAddress.Parse("0E4F69CCE4F0"),
+            IPAddress.Parse("192.168.31.213"),
+            "POCO-F6",
+            now,
+            now,
+            0,
+            0);
+        var changes = 0;
+        var viewModel = new DeviceViewModel(
+            _ =>
+            {
+                changes++;
+                return Task.CompletedTask;
+            });
+        viewModel.Initialize(snapshot, null, false, "Online");
+
+        viewModel.EditableName = "  Omar's phone  ";
+        viewModel.Update(snapshot with { HostName = "Android" }, null);
+
+        Assert.Equal("Omar's phone", viewModel.Alias);
+        Assert.Equal("Omar's phone", viewModel.DisplayName);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
     public void HasActiveRule_IsFalseForProtectedDevicesEvenWithSavedLimits()
     {
         var now = DateTimeOffset.Parse("2026-07-31T00:00:00Z");

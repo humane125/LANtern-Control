@@ -11,6 +11,8 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     private string ipAddress = string.Empty;
     private string macAddress = string.Empty;
     private string displayName = "Unknown device";
+    private string automaticName = "Unknown device";
+    private string? alias;
     private string downloadRate = "0 B/s";
     private string uploadRate = "0 B/s";
     private double downloadBytesPerSecond;
@@ -46,7 +48,33 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     public string DisplayName
     {
         get => displayName;
-        private set => SetField(ref displayName, value);
+        private set
+        {
+            if (SetField(ref displayName, value))
+            {
+                OnPropertyChanged(nameof(EditableName));
+            }
+        }
+    }
+
+    public string? Alias => alias;
+
+    public string EditableName
+    {
+        get => DisplayName;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (string.Equals(alias, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            alias = normalized;
+            OnPropertyChanged(nameof(Alias));
+            DisplayName = alias ?? automaticName;
+            _ = changed(this);
+        }
     }
 
     public string DownloadRate
@@ -150,6 +178,7 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     {
         MacKey = snapshot.MacAddress.ToString();
         MacAddress = FormatMac(MacKey);
+        alias = string.IsNullOrWhiteSpace(preferences?.Alias) ? null : preferences.Alias.Trim();
         downloadLimit = Math.Max(0, preferences?.DownloadKiloBytesPerSecond ?? 0);
         uploadLimit = Math.Max(0, preferences?.UploadKiloBytesPerSecond ?? 0);
         pauseInternet = !isProtectedDevice && (preferences?.PauseInternet ?? false);
@@ -165,11 +194,16 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     public void Update(DeviceSnapshot snapshot, string? alias)
     {
         IpAddress = snapshot.IpAddress.ToString();
-        DisplayName = !string.IsNullOrWhiteSpace(alias)
-            ? alias
-            : !string.IsNullOrWhiteSpace(snapshot.HostName)
-                ? snapshot.HostName
-                : $"Device {IpAddress}";
+        if (this.alias is null && !string.IsNullOrWhiteSpace(alias))
+        {
+            this.alias = alias.Trim();
+            OnPropertyChanged(nameof(Alias));
+        }
+
+        automaticName = !string.IsNullOrWhiteSpace(snapshot.HostName)
+            ? snapshot.HostName
+            : $"Device {IpAddress}";
+        DisplayName = this.alias ?? automaticName;
         DownloadBytesPerSecond = snapshot.DownloadBytesPerSecond;
         UploadBytesPerSecond = snapshot.UploadBytesPerSecond;
         DownloadRate = FormatRate(snapshot.DownloadBytesPerSecond);
