@@ -217,9 +217,14 @@ public partial class MainWindow : Window
             }
         }
 
-        if (Keyboard.FocusedElement is not TextBox)
+        var view = CollectionViewSource.GetDefaultView(Devices);
+        var editableView = view as IEditableCollectionView;
+        if (DeviceListRefreshPolicy.ShouldRefresh(
+                Keyboard.FocusedElement is TextBox,
+                editableView?.IsAddingNew == true,
+                editableView?.IsEditingItem == true))
         {
-            CollectionViewSource.GetDefaultView(Devices).Refresh();
+            view.Refresh();
         }
 
         RefreshDashboardSummary();
