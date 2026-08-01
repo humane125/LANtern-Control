@@ -148,7 +148,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 forwardingTask,
                 RunMaintenanceAsync(engineCancellation.Token));
             RaiseStatus(
-                "Adaptive control active — only devices with active rules are intercepted.");
+                "Live monitoring active — 0 KB/s is unlimited and remains visible.");
         }
         catch
         {
