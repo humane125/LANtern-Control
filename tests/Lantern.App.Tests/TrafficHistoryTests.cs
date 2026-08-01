@@ -74,4 +74,24 @@ public sealed class TrafficHistoryTests
         Assert.Equal(2_000, sample.TopDeviceDownloadBytesPerSecond);
         Assert.Equal(400, sample.TopDeviceUploadBytesPerSecond);
     }
+
+    [Fact]
+    public void TrafficSample_CarriesEveryDevicesIndividualRates()
+    {
+        var devices = new[]
+        {
+            new DeviceTrafficSnapshot("Laptop", 3_000, 200),
+            new DeviceTrafficSnapshot("Phone", 1_000, 100),
+        };
+        var sample = new TrafficSample(
+            DateTimeOffset.UnixEpoch,
+            4_000,
+            300,
+            "Laptop",
+            3_000,
+            200,
+            devices);
+
+        Assert.Equal(devices, sample.DeviceTraffic);
+    }
 }

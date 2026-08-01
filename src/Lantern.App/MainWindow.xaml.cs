@@ -11,6 +11,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Lantern.App.Controls;
 using Lantern.App.Services;
 using Lantern.App.ViewModels;
 using Lantern.Core.Control;
@@ -1038,14 +1039,12 @@ public partial class MainWindow : Window
                 summary.UploadBytesPerSecond,
                 summary.TopDeviceName,
                 summary.TopDeviceDownloadBytesPerSecond,
-                summary.TopDeviceUploadBytesPerSecond);
+                summary.TopDeviceUploadBytesPerSecond,
+                summary.DeviceTraffic);
             if (trafficHistory.TryAdd(sample, TrafficSamplingProfile.Interval))
             {
                 TrafficChart.Samples = trafficHistory.Samples;
-                ChartTopDeviceText.Text = string.IsNullOrWhiteSpace(sample.TopDevice)
-                    ? "No active device traffic"
-                    : $"{sample.TopDevice}  ↓ {DeviceViewModel.FormatRate(sample.TopDeviceDownloadBytesPerSecond)}  " +
-                      $"↑ {DeviceViewModel.FormatRate(sample.TopDeviceUploadBytesPerSecond)}";
+                ChartDeviceSummaryText.Text = TrafficChartPresentation.BuildLatestSummary(sample);
             }
         }
 

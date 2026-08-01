@@ -363,36 +363,6 @@
                 BorderBrush="{StaticResource Border}"
                 BorderThickness="0,0,1,0">
             <DockPanel Margin="18,24">
-                <Border DockPanel.Dock="Bottom"
-                        Margin="0,16,0,0"
-                        Padding="13"
-                        CornerRadius="10"
-                        Background="{StaticResource Surface}"
-                        BorderBrush="{StaticResource Border}"
-                        BorderThickness="1">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="7"
-                                     Height="7"
-                                     Margin="0,0,7,0"
-                                     Fill="{StaticResource Success}" />
-                            <TextBlock Text="LOCAL PROCESSING"
-                                       Foreground="{StaticResource SecondaryText}"
-                                       FontSize="10"
-                                       FontWeight="SemiBold" />
-                        </StackPanel>
-                        <TextBlock Margin="0,7,0,0"
-                                   Text="No router login required"
-                                   FontSize="11"
-                                   TextWrapping="Wrap" />
-                        <TextBlock Margin="0,3,0,0"
-                                   Text="Traffic stays on this PC"
-                                   Foreground="{StaticResource SecondaryText}"
-                                   FontSize="10"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
-
                 <StackPanel DockPanel.Dock="Top">
                     <StackPanel Margin="2,0,0,34" Orientation="Horizontal">
                         <Border Width="54"
@@ -843,11 +813,6 @@
                                            Text="Upload"
                                            Foreground="{StaticResource SecondaryText}"
                                            FontSize="11" />
-                                <Ellipse Width="7" Height="7" Fill="{StaticResource Success}" />
-                                <TextBlock Margin="6,0,0,0"
-                                           Text="1 sec live"
-                                           Foreground="{StaticResource SecondaryText}"
-                                           FontSize="11" />
                             </StackPanel>
                         </Grid>
                         <Separator Grid.Row="1" Background="{StaticResource Border}" />
@@ -861,17 +826,7 @@
                                 BorderBrush="{StaticResource Border}"
                                 BorderThickness="0,1,0,0">
                             <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="ChartRangeText"
-                                           Text="Last 1 hour  •  1 second samples"
-                                           Foreground="{StaticResource SecondaryText}"
-                                           FontSize="11" />
-                                <TextBlock x:Name="ChartTopDeviceText"
-                                           Grid.Column="1"
-                                           Margin="20,0,0,0"
+                                <TextBlock x:Name="ChartDeviceSummaryText"
                                            HorizontalAlignment="Right"
                                            Text="Waiting for device traffic"
                                            Foreground="{StaticResource PrimaryText}"

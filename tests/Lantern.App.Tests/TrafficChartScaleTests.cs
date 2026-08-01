@@ -97,4 +97,24 @@ public sealed class TrafficChartScaleTests
         Assert.Equal(start.AddMinutes(10), window.Start);
         Assert.Equal(start.AddMinutes(70), window.End);
     }
+
+    [Fact]
+    public void GetRenderSamples_ReducesDenseHistoryAndPreservesEndpointsAndSpikes()
+    {
+        var start = DateTimeOffset.UnixEpoch;
+        var samples = Enumerable.Range(0, 2_700)
+            .Select(index => new TrafficSample(
+                start.AddSeconds(index),
+                index == 1_350 ? 50_000 : 1_000 + (index % 100),
+                100,
+                null))
+            .ToArray();
+
+        var rendered = TrafficChartScale.GetRenderSamples(samples, 320);
+
+        Assert.True(rendered.Count <= 320);
+        Assert.Same(samples[0], rendered[0]);
+        Assert.Same(samples[^1], rendered[^1]);
+        Assert.Contains(samples[1_350], rendered);
+    }
 }

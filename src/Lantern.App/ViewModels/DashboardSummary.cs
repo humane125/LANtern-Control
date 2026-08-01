@@ -7,7 +7,8 @@ public sealed record DashboardSummary(
     int ActiveRules,
     string? TopDeviceName,
     double TopDeviceDownloadBytesPerSecond,
-    double TopDeviceUploadBytesPerSecond)
+    double TopDeviceUploadBytesPerSecond,
+    IReadOnlyList<DeviceTrafficSnapshot> DeviceTraffic)
 {
     public static DashboardSummary From(IEnumerable<DeviceViewModel> devices)
     {
@@ -23,6 +24,13 @@ public sealed record DashboardSummary(
             clients.Count(device => device.HasActiveRule),
             topDevice?.DisplayName,
             topDevice?.DownloadBytesPerSecond ?? 0,
-            topDevice?.UploadBytesPerSecond ?? 0);
+            topDevice?.UploadBytesPerSecond ?? 0,
+            clients
+                .Select(device => new DeviceTrafficSnapshot(
+                    device.DisplayName,
+                    device.DownloadBytesPerSecond,
+                    device.UploadBytesPerSecond))
+                .OrderByDescending(device => device.TotalBytesPerSecond)
+                .ToArray());
     }
 }

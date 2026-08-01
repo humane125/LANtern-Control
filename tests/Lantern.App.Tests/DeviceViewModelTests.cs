@@ -117,8 +117,7 @@ public sealed class DeviceViewModelTests
                         "AddDomainRuleButton",
                         "DomainRulesList",
                         "DomainRulesEmptyState",
-                        "ChartRangeText",
-                        "ChartTopDeviceText",
+                        "ChartDeviceSummaryText",
                         "DeviceSection",
                     })
                     {
@@ -240,6 +239,14 @@ public sealed class DeviceViewModelTests
                     var chart = Assert.IsType<Lantern.App.Controls.LiveTrafficChart>(
                         window.FindName("TrafficChart"));
                     Assert.Equal(TimeSpan.FromHours(1), chart.VisibleDuration);
+                    var xaml = File.ReadAllText(Path.Combine(
+                        GetProjectRoot(),
+                        "src",
+                        "Lantern.App",
+                        "MainWindow.xaml"));
+                    Assert.DoesNotContain("Text=\"LOCAL PROCESSING\"", xaml, StringComparison.Ordinal);
+                    Assert.DoesNotContain("Text=\"1 sec live\"", xaml, StringComparison.Ordinal);
+                    Assert.DoesNotContain("1 second samples", xaml, StringComparison.Ordinal);
                     chart.Measure(new System.Windows.Size(800, 238));
                     chart.Arrange(new System.Windows.Rect(0, 0, 800, 238));
                     var emptyChartBitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(

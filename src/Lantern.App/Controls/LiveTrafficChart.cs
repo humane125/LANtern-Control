@@ -90,6 +90,9 @@ public sealed class LiveTrafficChart : FrameworkElement
         var window = TrafficChartScale.GetWindow(samples, GetVisibleDuration());
         var start = window.Start;
         var end = window.End;
+        var renderSamples = TrafficChartScale.GetRenderSamples(
+            samples,
+            Math.Max(2, (int)(plotWidth / 3)));
         DrawGrid(
             drawingContext,
             plotWidth,
@@ -101,7 +104,7 @@ public sealed class LiveTrafficChart : FrameworkElement
         var maximum = TrafficChartScale.GetMaximum(samples);
         DrawSeries(
             drawingContext,
-            samples,
+            renderSamples,
             sample => sample.DownloadBytesPerSecond,
             start,
             end,
@@ -111,7 +114,7 @@ public sealed class LiveTrafficChart : FrameworkElement
             download);
         DrawSeries(
             drawingContext,
-            samples,
+            renderSamples,
             sample => sample.UploadBytesPerSecond,
             start,
             end,
@@ -210,15 +213,7 @@ public sealed class LiveTrafficChart : FrameworkElement
 
     private void UpdateToolTip(TrafficSample sample)
     {
-        var topDevice = string.IsNullOrWhiteSpace(sample.TopDevice)
-            ? "No active device"
-            : sample.TopDevice;
-        ToolTip = $"{sample.Timestamp.LocalDateTime:h:mm:ss tt}\n" +
-                  $"Download  {DeviceViewModel.FormatRate(sample.DownloadBytesPerSecond)}\n" +
-                  $"Upload      {DeviceViewModel.FormatRate(sample.UploadBytesPerSecond)}\n" +
-                  $"Top device  {topDevice}\n" +
-                  $"Device down {DeviceViewModel.FormatRate(sample.TopDeviceDownloadBytesPerSecond)}\n" +
-                  $"Device up   {DeviceViewModel.FormatRate(sample.TopDeviceUploadBytesPerSecond)}";
+        ToolTip = TrafficChartPresentation.BuildHoverText(sample);
     }
 
     private static void DrawGrid(
@@ -365,13 +360,7 @@ public sealed class LiveTrafficChart : FrameworkElement
         TrafficSample sample,
         double sampleX)
     {
-        var deviceName = string.IsNullOrWhiteSpace(sample.TopDevice)
-            ? "No active device"
-            : sample.TopDevice;
-        var content = $"{sample.Timestamp.LocalDateTime:h:mm:ss tt}\n" +
-                      $"{deviceName}\n" +
-                      $"↓ {DeviceViewModel.FormatRate(sample.TopDeviceDownloadBytesPerSecond)}    " +
-                      $"↑ {DeviceViewModel.FormatRate(sample.TopDeviceUploadBytesPerSecond)}";
+        var content = TrafficChartPresentation.BuildHoverText(sample);
         var text = CreateText(
             content,
             GetBrush("PrimaryText", Color.FromRgb(244, 238, 240)),

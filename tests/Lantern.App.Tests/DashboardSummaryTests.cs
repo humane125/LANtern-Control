@@ -46,6 +46,20 @@ public sealed class DashboardSummaryTests
         Assert.Equal("POCO-F6", summary.TopDeviceName);
         Assert.Equal(2_000, summary.TopDeviceDownloadBytesPerSecond);
         Assert.Equal(400, summary.TopDeviceUploadBytesPerSecond);
+        Assert.Collection(
+            summary.DeviceTraffic,
+            device =>
+            {
+                Assert.Equal("POCO-F6", device.DeviceName);
+                Assert.Equal(2_000, device.DownloadBytesPerSecond);
+                Assert.Equal(400, device.UploadBytesPerSecond);
+            },
+            device =>
+            {
+                Assert.Equal("Humane", device.DeviceName);
+                Assert.Equal(800, device.DownloadBytesPerSecond);
+                Assert.Equal(100, device.UploadBytesPerSecond);
+            });
     }
 
     [Fact]
@@ -60,6 +74,7 @@ public sealed class DashboardSummaryTests
         Assert.Null(summary.TopDeviceName);
         Assert.Equal(0, summary.TopDeviceDownloadBytesPerSecond);
         Assert.Equal(0, summary.TopDeviceUploadBytesPerSecond);
+        Assert.Empty(summary.DeviceTraffic);
     }
 
     private static DeviceViewModel CreateDevice(
