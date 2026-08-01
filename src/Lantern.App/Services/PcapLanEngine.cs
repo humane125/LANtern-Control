@@ -501,7 +501,10 @@ public sealed class PcapLanEngine : IAsyncDisposable
         var result = frameRouter.Route(bytes);
         if (result.Direction is not null && result.ClientMac is not null)
         {
-            registry.RecordTraffic(result.ClientMac, result.Direction.Value, bytes.Length);
+            registry.RecordTraffic(
+                result.ClientMac,
+                result.Direction.Value,
+                result.MeteredByteCount);
         }
 
         if (result.Action == FrameAction.Forward && result.Frame is not null)
