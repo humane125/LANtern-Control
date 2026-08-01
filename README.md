@@ -4,7 +4,7 @@
 
 # LANtern Control
 
-<a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.0" src="https://img.shields.io/badge/release-v0.1.0-C51B3A?style=flat-square"></a>
+<a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.1" src="https://img.shields.io/badge/release-v0.1.1-C51B3A?style=flat-square"></a>
 <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-C51B3A?style=flat-square"></a>
 <img alt="C#" src="https://img.shields.io/badge/language-C%23-239120?style=flat-square&amp;logo=csharp">
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&amp;logo=dotnet">
@@ -72,7 +72,7 @@ Download the latest version from [GitHub Releases](https://github.com/humane125/
 
 ### Installer
 
-1. Download `LANtern-Control-Setup-v0.1.0.exe`.
+1. Download `LANtern-Control-Setup-v0.1.1.exe`.
 2. Run the setup program.
 3. Choose the installation folder and whether to create Start Menu or desktop
    shortcuts.
@@ -80,7 +80,7 @@ Download the latest version from [GitHub Releases](https://github.com/humane125/
 
 ### Portable version
 
-1. Download `LANtern-Control-v0.1.0.exe`.
+1. Download `LANtern-Control-v0.1.1.exe`.
 2. Place it in a folder where it can remain.
 3. Run it as Administrator. No application installation is required.
 
