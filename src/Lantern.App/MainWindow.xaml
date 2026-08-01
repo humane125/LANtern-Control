@@ -1333,9 +1333,122 @@
                             </Grid>
                         </Border>
                         <Grid Grid.Row="4" MinHeight="250">
-                            <ItemsControl x:Name="DomainRulesList"
-                                          Margin="20,0,20,18"
-                                          ItemsSource="{Binding DomainRules}">
+                            <StackPanel Margin="20,0,20,18">
+                                <ItemsControl x:Name="DomainPresetRulesList"
+                                              ItemsSource="{Binding DomainPresetRules}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,10"
+                                                    CornerRadius="9"
+                                                    Background="#0D0C0E"
+                                                    BorderBrush="#522029"
+                                                    BorderThickness="1"
+                                                    ClipToBounds="True">
+                                                <Expander Style="{StaticResource ActivityExpanderStyle}">
+                                                    <Expander.Header>
+                                                        <Grid MinHeight="62">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="42" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Width="30"
+                                                                    Height="30"
+                                                                    HorizontalAlignment="Left"
+                                                                    VerticalAlignment="Center"
+                                                                    CornerRadius="8"
+                                                                    Background="{StaticResource AccentDark}">
+                                                                <Path Width="15"
+                                                                      Height="16"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"
+                                                                      Data="{StaticResource IconShield}"
+                                                                      Stroke="{StaticResource Accent}"
+                                                                      StrokeThickness="1.7"
+                                                                      StrokeLineJoin="Round"
+                                                                      Stretch="Uniform" />
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1"
+                                                                        VerticalAlignment="Center">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding PresetName}"
+                                                                               FontSize="13"
+                                                                               FontWeight="SemiBold" />
+                                                                    <Border Margin="9,0,0,0"
+                                                                            Padding="7,2"
+                                                                            CornerRadius="5"
+                                                                            Background="{StaticResource AccentDark}">
+                                                                        <TextBlock Text="PRESET"
+                                                                                   Foreground="{StaticResource Accent}"
+                                                                                   FontSize="9"
+                                                                                   FontWeight="Bold" />
+                                                                    </Border>
+                                                                </StackPanel>
+                                                                <TextBlock Margin="0,4,0,0"
+                                                                           Text="{Binding DeviceName}"
+                                                                           Foreground="{StaticResource SecondaryText}"
+                                                                           FontSize="10" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2"
+                                                                       Margin="18,0,6,0"
+                                                                       VerticalAlignment="Center"
+                                                                       Text="{Binding DomainCountText}"
+                                                                       Foreground="{StaticResource Accent}"
+                                                                       FontSize="11"
+                                                                       FontWeight="SemiBold" />
+                                                        </Grid>
+                                                    </Expander.Header>
+                                                    <Border Margin="12,0,12,12"
+                                                            Padding="14,12"
+                                                            Background="#0A090B"
+                                                            BorderBrush="{StaticResource Border}"
+                                                            BorderThickness="1,1,1,1"
+                                                            CornerRadius="8">
+                                                        <StackPanel>
+                                                            <TextBlock Margin="2,0,0,8"
+                                                                       Text="BLOCKED DOMAINS"
+                                                                       Foreground="{StaticResource SecondaryText}"
+                                                                       FontSize="9"
+                                                                       FontWeight="SemiBold" />
+                                                            <ItemsControl ItemsSource="{Binding Domains}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Grid MinHeight="31">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="16" />
+                                                                                <ColumnDefinition Width="*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <Ellipse Width="5"
+                                                                                     Height="5"
+                                                                                     HorizontalAlignment="Left"
+                                                                                     VerticalAlignment="Center"
+                                                                                     Fill="{StaticResource Accent}" />
+                                                                            <TextBlock Grid.Column="1"
+                                                                                       VerticalAlignment="Center"
+                                                                                       Text="{Binding}"
+                                                                                       Foreground="{StaticResource PrimaryText}"
+                                                                                       FontSize="11" />
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <Button Margin="0,10,0,0"
+                                                                    MinWidth="112"
+                                                                    MinHeight="34"
+                                                                    Padding="13,6"
+                                                                    HorizontalAlignment="Right"
+                                                                    Tag="{Binding}"
+                                                                    Click="RemoveDomainPresetButton_OnClick"
+                                                                    Content="Remove preset" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Expander>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ItemsControl x:Name="DomainRulesList"
+                                              ItemsSource="{Binding DomainRules}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Margin="0,0,0,10"
@@ -1401,7 +1514,8 @@
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                </ItemsControl>
+                            </StackPanel>
                             <StackPanel x:Name="DomainRulesEmptyState"
                                         Margin="0,50"
                                         HorizontalAlignment="Center"

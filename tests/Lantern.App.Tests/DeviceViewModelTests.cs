@@ -115,6 +115,7 @@ public sealed class DeviceViewModelTests
                         "DomainRuleDeviceSelector",
                         "DomainRuleInput",
                         "AddDomainRuleButton",
+                        "DomainPresetRulesList",
                         "DomainRulesList",
                         "DomainRulesEmptyState",
                         "ChartDeviceSummaryText",
@@ -247,6 +248,9 @@ public sealed class DeviceViewModelTests
                     Assert.DoesNotContain("Text=\"LOCAL PROCESSING\"", xaml, StringComparison.Ordinal);
                     Assert.DoesNotContain("Text=\"1 sec live\"", xaml, StringComparison.Ordinal);
                     Assert.DoesNotContain("1 second samples", xaml, StringComparison.Ordinal);
+                    Assert.Contains("ItemsSource=\"{Binding DomainPresetRules}\"", xaml, StringComparison.Ordinal);
+                    Assert.Contains("Text=\"{Binding PresetName}\"", xaml, StringComparison.Ordinal);
+                    Assert.Contains("ItemsSource=\"{Binding Domains}\"", xaml, StringComparison.Ordinal);
                     chart.Measure(new System.Windows.Size(800, 238));
                     chart.Arrange(new System.Windows.Rect(0, 0, 800, 238));
                     var emptyChartBitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(

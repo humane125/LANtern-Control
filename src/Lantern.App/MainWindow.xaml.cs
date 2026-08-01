@@ -80,6 +80,12 @@ public partial class MainWindow : Window
             new SortDescription(nameof(DomainRuleViewModel.DeviceName), ListSortDirection.Ascending));
         domainRuleView.SortDescriptions.Add(
             new SortDescription(nameof(DomainRuleViewModel.Domain), ListSortDirection.Ascending));
+
+        var domainPresetRuleView = CollectionViewSource.GetDefaultView(DomainPresetRules);
+        domainPresetRuleView.SortDescriptions.Add(
+            new SortDescription(nameof(DomainPresetRuleViewModel.DeviceName), ListSortDirection.Ascending));
+        domainPresetRuleView.SortDescriptions.Add(
+            new SortDescription(nameof(DomainPresetRuleViewModel.PresetName), ListSortDirection.Ascending));
     }
 
     public ObservableCollection<DeviceViewModel> Devices { get; } = [];
@@ -91,6 +97,8 @@ public partial class MainWindow : Window
     public ObservableCollection<DeviceViewModel> DomainRuleDevices { get; } = [];
 
     public ObservableCollection<DomainRuleViewModel> DomainRules { get; } = [];
+
+    public ObservableCollection<DomainPresetRuleViewModel> DomainPresetRules { get; } = [];
 
     public IReadOnlyList<DomainBlockPreset> DomainPresets => DomainBlockPresetCatalog.All;
 
@@ -366,8 +374,21 @@ public partial class MainWindow : Window
         }
 
         DomainPresetValidationText.Visibility = Visibility.Collapsed;
+        var macKey = TrafficPolicy.NormalizeMac(device.MacKey);
+        if (!settings.AppliedDomainPresets.TryGetValue(macKey, out var appliedPresets))
+        {
+            appliedPresets = [];
+            settings.AppliedDomainPresets[macKey] = appliedPresets;
+        }
+
+        if (!appliedPresets.Contains(preset.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            appliedPresets.Add(preset.Name);
+            appliedPresets.Sort(StringComparer.OrdinalIgnoreCase);
+        }
+
         await AddDomainBlocksAsync(
-            device.MacKey,
+            macKey,
             preset.Domains,
             $"Applied the {preset.Name} preset to {device.DisplayName}. " +
             "Reconnect the app so existing sessions close.");
@@ -378,6 +399,14 @@ public partial class MainWindow : Window
         if (sender is Button { Tag: DomainRuleViewModel rule })
         {
             await RemoveDomainBlockAsync(rule);
+        }
+    }
+
+    private async void RemoveDomainPresetButton_OnClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is Button { Tag: DomainPresetRuleViewModel preset })
+        {
+            await RemoveDomainPresetAsync(preset);
         }
     }
 
@@ -414,11 +443,7 @@ public partial class MainWindow : Window
 
         domains.Sort(StringComparer.OrdinalIgnoreCase);
         policy.SetBlockedDomains(macKey, domains);
-        foreach (var domain in domains)
-        {
-            UpsertDomainRule(macKey, domain);
-        }
-
+        RebuildDomainRulePresentation();
         RefreshBlockedActivityState();
         await SaveDomainRulesAsync(status);
     }
@@ -440,9 +465,46 @@ public partial class MainWindow : Window
             settings.BlockedDomains.TryGetValue(rule.MacKey, out var remaining)
                 ? remaining
                 : []);
-        DomainRules.Remove(rule);
+        RebuildDomainRulePresentation();
         RefreshBlockedActivityState();
         await SaveDomainRulesAsync($"Unblocked {rule.Domain} for {rule.DeviceName}.");
+    }
+
+    private async Task RemoveDomainPresetAsync(DomainPresetRuleViewModel preset)
+    {
+        if (settings.AppliedDomainPresets.TryGetValue(preset.MacKey, out var appliedPresets))
+        {
+            appliedPresets.RemoveAll(name =>
+                name.Equals(preset.PresetName, StringComparison.OrdinalIgnoreCase));
+            if (appliedPresets.Count == 0)
+            {
+                settings.AppliedDomainPresets.Remove(preset.MacKey);
+            }
+        }
+
+        var domainsStillClaimed = settings.AppliedDomainPresets
+            .GetValueOrDefault(preset.MacKey, [])
+            .SelectMany(name => DomainBlockPresetCatalog.All
+                .Where(candidate => candidate.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(candidate => candidate.Domains))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (settings.BlockedDomains.TryGetValue(preset.MacKey, out var blockedDomains))
+        {
+            blockedDomains.RemoveAll(domain =>
+                preset.Domains.Contains(domain, StringComparer.OrdinalIgnoreCase) &&
+                !domainsStillClaimed.Contains(domain));
+            if (blockedDomains.Count == 0)
+            {
+                settings.BlockedDomains.Remove(preset.MacKey);
+            }
+        }
+
+        policy.SetBlockedDomains(
+            preset.MacKey,
+            settings.BlockedDomains.GetValueOrDefault(preset.MacKey, []));
+        RebuildDomainRulePresentation();
+        RefreshBlockedActivityState();
+        await SaveDomainRulesAsync($"Removed the {preset.PresetName} preset from {preset.DeviceName}.");
     }
 
     private async Task SaveDomainRulesAsync(string status)
@@ -462,35 +524,37 @@ public partial class MainWindow : Window
 
     private void LoadDomainRulesFromSettings()
     {
-        DomainRules.Clear();
         foreach (var pair in settings.BlockedDomains)
         {
             policy.SetBlockedDomains(pair.Key, pair.Value);
-            foreach (var domain in pair.Value)
-            {
-                UpsertDomainRule(pair.Key, domain);
-            }
         }
 
+        RebuildDomainRulePresentation();
         RefreshBlockedActivityState();
         RefreshDomainRulesState();
     }
 
-    private void UpsertDomainRule(string macKey, string domain)
+    private void RebuildDomainRulePresentation()
     {
-        var existing = DomainRules.FirstOrDefault(rule =>
-            rule.MacKey.Equals(macKey, StringComparison.OrdinalIgnoreCase) &&
-            rule.Domain.Equals(domain, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
+        DomainPresetRules.Clear();
+        DomainRules.Clear();
+        foreach (var pair in settings.BlockedDomains)
         {
-            existing.UpdateDeviceName(ResolveDeviceName(macKey));
-            return;
-        }
+            var presentation = DomainRulePresentationBuilder.Build(
+                pair.Key,
+                ResolveDeviceName(pair.Key),
+                pair.Value,
+                settings.AppliedDomainPresets.GetValueOrDefault(pair.Key, []));
+            foreach (var preset in presentation.Presets)
+            {
+                DomainPresetRules.Add(preset);
+            }
 
-        DomainRules.Add(new DomainRuleViewModel(
-            macKey,
-            ResolveDeviceName(macKey),
-            domain));
+            foreach (var rule in presentation.IndividualRules)
+            {
+                DomainRules.Add(rule);
+            }
+        }
     }
 
     private string ResolveDeviceName(string macKey)
@@ -526,11 +590,13 @@ public partial class MainWindow : Window
 
     private void RefreshDomainRulesState()
     {
-        DomainRulesEmptyState.Visibility = DomainRules.Count == 0
+        DomainRulesEmptyState.Visibility = DomainRules.Count == 0 && DomainPresetRules.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
-        DomainRuleCountText.Text =
-            $"{DomainRules.Count} rule{(DomainRules.Count == 1 ? string.Empty : "s")}";
+        var presetLabel = $"{DomainPresetRules.Count} preset{(DomainPresetRules.Count == 1 ? string.Empty : "s")}";
+        var ruleLabel = $"{DomainRules.Count} rule{(DomainRules.Count == 1 ? string.Empty : "s")}";
+        DomainRuleCountText.Text = $"{presetLabel}  •  {ruleLabel}";
+        CollectionViewSource.GetDefaultView(DomainPresetRules).Refresh();
         CollectionViewSource.GetDefaultView(DomainRules).Refresh();
     }
 
@@ -613,6 +679,12 @@ public partial class MainWindow : Window
             {
                 rule.UpdateDeviceName(device.DisplayName);
             }
+
+            foreach (var preset in DomainPresetRules.Where(preset =>
+                         preset.MacKey.Equals(device.MacKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                preset.UpdateDeviceName(device.DisplayName);
+            }
         }
 
         if (DomainRuleDeviceSelector.SelectedItem is null && DomainRuleDevices.Count > 0)
@@ -626,6 +698,7 @@ public partial class MainWindow : Window
         }
 
         CollectionViewSource.GetDefaultView(DomainRuleDevices).Refresh();
+        CollectionViewSource.GetDefaultView(DomainPresetRules).Refresh();
         CollectionViewSource.GetDefaultView(DomainRules).Refresh();
     }
 

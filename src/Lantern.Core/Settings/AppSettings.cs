@@ -11,6 +11,9 @@ public sealed class AppSettings
 
     public Dictionary<string, List<string>> BlockedDomains { get; init; } =
         new(StringComparer.OrdinalIgnoreCase);
+
+    public Dictionary<string, List<string>> AppliedDomainPresets { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class DevicePreferences

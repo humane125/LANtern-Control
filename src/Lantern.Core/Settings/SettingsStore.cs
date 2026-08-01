@@ -159,6 +159,54 @@ public sealed class SettingsStore
             }
         }
 
+        foreach (var pair in settings.AppliedDomainPresets)
+        {
+            string mac;
+            try
+            {
+                mac = TrafficPolicy.NormalizeMac(pair.Key);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            var presetNames = (pair.Value ?? [])
+                .Select(candidate => DomainBlockPresetCatalog.All.FirstOrDefault(preset =>
+                    preset.Name.Equals(candidate?.Trim(), StringComparison.OrdinalIgnoreCase))?.Name)
+                .Where(name => name is not null)
+                .Cast<string>()
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (presetNames.Count == 0)
+            {
+                continue;
+            }
+
+            normalized.AppliedDomainPresets[mac] = presetNames;
+            if (!normalized.BlockedDomains.TryGetValue(mac, out var blockedDomains))
+            {
+                blockedDomains = [];
+                normalized.BlockedDomains[mac] = blockedDomains;
+            }
+
+            foreach (var presetName in presetNames)
+            {
+                var preset = DomainBlockPresetCatalog.All.First(item =>
+                    item.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase));
+                foreach (var domain in preset.Domains)
+                {
+                    if (!blockedDomains.Contains(domain, StringComparer.OrdinalIgnoreCase))
+                    {
+                        blockedDomains.Add(domain);
+                    }
+                }
+            }
+
+            blockedDomains.Sort(StringComparer.OrdinalIgnoreCase);
+        }
+
         return normalized;
     }
 

@@ -105,6 +105,37 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public async Task SaveAndLoad_PersistsAppliedPresetIdentityAndRestoresItsDomains()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var settings = new AppSettings
+            {
+                AppliedDomainPresets =
+                {
+                    ["e2:61:19:0d:bd:54"] = [" youtube ", "YouTube", "unknown"],
+                },
+            };
+            var store = new SettingsStore(directory);
+
+            await store.SaveAsync(settings);
+            var loaded = await store.LoadAsync();
+
+            var presets = Assert.Single(loaded.AppliedDomainPresets);
+            Assert.Equal("E261190DBD54", presets.Key);
+            Assert.Equal(["YouTube"], presets.Value);
+            var domains = Assert.Single(loaded.BlockedDomains);
+            Assert.Contains("youtube.com", domains.Value);
+            Assert.Contains("googlevideo.com", domains.Value);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Load_MalformedJsonReturnsEmptySettings()
     {
         var directory = CreateTemporaryDirectory();
