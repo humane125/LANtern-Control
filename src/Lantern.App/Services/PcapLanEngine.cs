@@ -148,7 +148,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 forwardingTask,
                 RunMaintenanceAsync(engineCancellation.Token));
             RaiseStatus(
-                "Control active — dedicated two-way forwarding is handling device traffic.");
+                "Adaptive control active — only devices with active rules are intercepted.");
         }
         catch
         {
@@ -411,10 +411,12 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
     }
 
-    public Task ApplyRuleAsync(string macAddress, TrafficRule rule)
+    public async Task ApplyRuleAsync(string macAddress, TrafficRule rule)
     {
         var clients = clientMappings.Mappings;
+        var previousTargets = policy.GetInterceptionTargets(macAddress);
         policy.SetRule(macAddress, rule.Normalize());
+        var currentTargets = policy.GetInterceptionTargets(macAddress);
         if (controlling)
         {
             var normalizedMac = TrafficPolicy.NormalizeMac(macAddress);
@@ -425,13 +427,13 @@ public sealed class PcapLanEngine : IAsyncDisposable
                         normalizedMac,
                         StringComparison.Ordinal))
                 {
-                    PoisonClient(client);
+                    await ApplyInterceptionTransitionAsync(
+                        client,
+                        InterceptionTransition.Between(previousTargets, currentTargets));
                     break;
                 }
             }
         }
-
-        return Task.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
@@ -681,9 +683,17 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
     private void PoisonClient(KeyValuePair<IPAddress, PhysicalAddress> client)
     {
+        PoisonClient(client, policy.GetInterceptionTargets(client.Value.ToString()));
+    }
+
+    private void PoisonClient(
+        KeyValuePair<IPAddress, PhysicalAddress> client,
+        InterceptionTargets targets)
+    {
         var activeProfile = profile;
         var activeGatewayMac = gatewayMac;
-        if (!controlling || restoring || activeProfile is null || activeGatewayMac is null)
+        if (!controlling || restoring || targets == InterceptionTargets.None ||
+            activeProfile is null || activeGatewayMac is null)
         {
             return;
         }
@@ -694,8 +704,11 @@ public sealed class PcapLanEngine : IAsyncDisposable
             activeGatewayMac,
             client.Key,
             client.Value);
-        SendArpPacket(frames.ToClient);
-        SendArpPacket(frames.ToGateway);
+        foreach (var frame in frames.Select(targets))
+        {
+            SendArpPacket(frame);
+        }
+
         var controllerFrames = ArpInterceptionFrames.BuildControllerProtection(
             activeProfile.LocalMac,
             activeProfile.LocalAddress,
@@ -705,6 +718,39 @@ public sealed class PcapLanEngine : IAsyncDisposable
             client.Key);
         SendArpPacket(controllerFrames.ClientToController);
         SendArpPacket(controllerFrames.GatewayToController);
+    }
+
+    private async Task ApplyInterceptionTransitionAsync(
+        KeyValuePair<IPAddress, PhysicalAddress> client,
+        InterceptionTransition transition)
+    {
+        var activeProfile = profile;
+        var activeGatewayMac = gatewayMac;
+        if (!controlling || restoring || activeProfile is null || activeGatewayMac is null)
+        {
+            return;
+        }
+
+        if (transition.Restore == InterceptionTargets.None)
+        {
+            PoisonClient(client);
+            return;
+        }
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            if (!controlling || restoring || arpDevice is null)
+            {
+                return;
+            }
+
+            SendRestoreFrames(client, activeProfile, activeGatewayMac);
+            PoisonClient(client);
+            if (attempt < 2)
+            {
+                await Task.Delay(40);
+            }
+        }
     }
 
     private void SendRestoreFrames(
@@ -746,6 +792,12 @@ public sealed class PcapLanEngine : IAsyncDisposable
         if (request.TargetIp.Equals(activeProfile.GatewayAddress) &&
             clients.TryGetValue(request.SenderIp, out var requestingClient))
         {
+            if (!policy.GetInterceptionTargets(requestingClient.ToString())
+                    .HasFlag(InterceptionTargets.Client))
+            {
+                return;
+            }
+
             var frames = ArpInterceptionFrames.BuildPoison(
                 activeProfile.LocalMac,
                 activeProfile.GatewayAddress,
@@ -759,6 +811,12 @@ public sealed class PcapLanEngine : IAsyncDisposable
         if (request.SenderIp.Equals(activeProfile.GatewayAddress) &&
             clients.TryGetValue(request.TargetIp, out var requestedClient))
         {
+            if (!policy.GetInterceptionTargets(requestedClient.ToString())
+                    .HasFlag(InterceptionTargets.Gateway))
+            {
+                return;
+            }
+
             var frames = ArpInterceptionFrames.BuildPoison(
                 activeProfile.LocalMac,
                 activeProfile.GatewayAddress,

@@ -42,8 +42,15 @@ public sealed class TrafficPolicy
 
     public InterceptionTargets GetInterceptionTargets(string macAddress)
     {
-        _ = GetRule(macAddress);
-        return InterceptionTargets.Client | InterceptionTargets.Gateway;
+        var rule = GetRule(macAddress);
+        if (rule.DownloadKiloBytesPerSecond > 0)
+        {
+            return InterceptionTargets.Client | InterceptionTargets.Gateway;
+        }
+
+        return rule.PauseInternet || rule.UploadKiloBytesPerSecond > 0
+            ? InterceptionTargets.Client
+            : InterceptionTargets.None;
     }
 
     public void RemoveRule(string macAddress) => rules.TryRemove(NormalizeMac(macAddress), out _);
