@@ -6,6 +6,7 @@ namespace Lantern.App.ViewModels;
 public sealed class DomainPresetRuleViewModel : INotifyPropertyChanged
 {
     private string deviceName;
+    private bool isExpanded;
 
     public DomainPresetRuleViewModel(
         string macKey,
@@ -41,6 +42,21 @@ public sealed class DomainPresetRuleViewModel : INotifyPropertyChanged
     public string PresetName { get; }
 
     public IReadOnlyList<string> Domains { get; }
+
+    public bool IsExpanded
+    {
+        get => isExpanded;
+        set
+        {
+            if (isExpanded == value)
+            {
+                return;
+            }
+
+            isExpanded = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+        }
+    }
 
     public string DomainCountText =>
         $"{Domains.Count} blocked domain{(Domains.Count == 1 ? string.Empty : "s")}";

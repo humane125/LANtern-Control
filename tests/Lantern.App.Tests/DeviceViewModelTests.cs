@@ -251,6 +251,7 @@ public sealed class DeviceViewModelTests
                     Assert.Contains("ItemsSource=\"{Binding DomainPresetRules}\"", xaml, StringComparison.Ordinal);
                     Assert.Contains("Text=\"{Binding PresetName}\"", xaml, StringComparison.Ordinal);
                     Assert.Contains("ItemsSource=\"{Binding Domains}\"", xaml, StringComparison.Ordinal);
+                    Assert.Contains("IsExpanded=\"{Binding IsExpanded, Mode=TwoWay}\"", xaml, StringComparison.Ordinal);
                     chart.Measure(new System.Windows.Size(800, 238));
                     chart.Arrange(new System.Windows.Rect(0, 0, 800, 238));
                     var emptyChartBitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(

@@ -49,4 +49,22 @@ public sealed class DomainRulePresentationBuilderTests
         Assert.Empty(presentation.Presets);
         Assert.Equal(2, presentation.IndividualRules.Count);
     }
+
+    [Fact]
+    public void PresetRule_ExpandedStateSurvivesPeriodicDeviceRefresh()
+    {
+        var preset = new DomainPresetRuleViewModel(
+            "E261190DBD54",
+            "POCO-F6",
+            "YouTube",
+            ["youtube.com"])
+        {
+            IsExpanded = true,
+        };
+
+        preset.UpdateDeviceName("Living room phone");
+
+        Assert.True(preset.IsExpanded);
+        Assert.Equal("Living room phone", preset.DeviceName);
+    }
 }

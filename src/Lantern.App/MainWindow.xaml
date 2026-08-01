@@ -1344,7 +1344,8 @@
                                                     BorderBrush="#522029"
                                                     BorderThickness="1"
                                                     ClipToBounds="True">
-                                                <Expander Style="{StaticResource ActivityExpanderStyle}">
+                                                <Expander Style="{StaticResource ActivityExpanderStyle}"
+                                                          IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
                                                     <Expander.Header>
                                                         <Grid MinHeight="62">
                                                             <Grid.ColumnDefinitions>
