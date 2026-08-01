@@ -259,7 +259,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 !previousMac.Equals(neighbor.MacAddress);
             clients[neighbor.Address] = neighbor.MacAddress;
             frameRouter?.UpdateClient(neighbor.Address, neighbor.MacAddress);
-            registry.Observe(
+            registry.Remember(
                 neighbor.Address,
                 neighbor.MacAddress,
                 DateTimeOffset.UtcNow);
@@ -534,6 +534,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
         var clients = clientMappings.Mappings;
         var activeProfile = profile;
         if (activeProfile is null ||
+            !arp.HasConsistentSender ||
             arp.SenderIp.Equals(IPAddress.Any) ||
             arp.SenderMac.Equals(activeProfile.LocalMac) ||
             IsZeroOrBroadcast(arp.SenderMac))
@@ -671,10 +672,24 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 activeProfile,
                 clientMappings.Mappings,
                 cancellationToken);
+            ProbeKnownClients(activeProfile);
         }
         finally
         {
             refreshSync.Release();
+        }
+    }
+
+    private void ProbeKnownClients(AdapterProfile activeProfile)
+    {
+        foreach (var client in clientMappings.Mappings)
+        {
+            SendArpPacket(
+                EthernetFrameCodec.BuildUnicastArpRequest(
+                    activeProfile.LocalMac,
+                    activeProfile.LocalAddress,
+                    client.Value,
+                    client.Key));
         }
     }
 

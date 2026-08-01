@@ -22,6 +22,7 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
     private int uploadLimit;
     private bool pauseInternet;
     private bool isProtected;
+    private bool isOnline = true;
     private string protectedReason = string.Empty;
 
     public DeviceViewModel(Func<DeviceViewModel, Task> changed)
@@ -161,6 +162,12 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
 
     public bool CanControl => !IsProtected;
 
+    public bool IsOnline
+    {
+        get => isOnline;
+        private set => SetField(ref isOnline, value);
+    }
+
     public bool HasActiveRule =>
         CanControl && (PauseInternet || DownloadLimit > 0 || UploadLimit > 0);
 
@@ -209,6 +216,15 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
         DownloadRate = FormatRate(snapshot.DownloadBytesPerSecond);
         UploadRate = FormatRate(snapshot.UploadBytesPerSecond);
         TotalRate = snapshot.TotalBytesPerSecond;
+    }
+
+    public void SetPresence(bool online)
+    {
+        IsOnline = online;
+        if (!IsProtected)
+        {
+            ProtectedReason = online ? "Online" : "Offline";
+        }
     }
 
     public static string FormatRate(double bytesPerSecond)

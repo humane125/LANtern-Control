@@ -176,7 +176,15 @@ public partial class MainWindow : Window
     private void RefreshDevices(object? sender, EventArgs eventArgs)
     {
         var activeProfile = AdapterSelector.SelectedItem as AdapterProfile;
-        foreach (var snapshot in registry.TakeSnapshot(DateTimeOffset.UtcNow))
+        var now = DateTimeOffset.UtcNow;
+        var view = CollectionViewSource.GetDefaultView(Devices);
+        var editableView = view as IEditableCollectionView;
+        var canMutateView = DeviceListRefreshPolicy.ShouldRefresh(
+            Keyboard.FocusedElement is TextBox,
+            editableView?.IsAddingNew == true,
+            editableView?.IsEditingItem == true);
+        var visibleKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var snapshot in registry.TakeSnapshot(now))
         {
             if (activeProfile is not null &&
                 (snapshot.IpAddress.Equals(activeProfile.LocalAddress) ||
@@ -189,6 +197,15 @@ public partial class MainWindow : Window
             settings.Devices.TryGetValue(key, out var preferences);
             var isGateway = activeProfile is not null &&
                             snapshot.IpAddress.Equals(activeProfile.GatewayAddress);
+            var presence = isGateway
+                ? DevicePresence.Online
+                : DevicePresencePolicy.Classify(snapshot.LastSeen, now);
+            if (presence == DevicePresence.Hidden)
+            {
+                continue;
+            }
+
+            visibleKeys.Add(key);
             if (!isGateway)
             {
                 preferences ??= settings.Devices[key] = new DevicePreferences();
@@ -202,6 +219,11 @@ public partial class MainWindow : Window
 
             if (!deviceIndex.TryGetValue(key, out var viewModel))
             {
+                if (!canMutateView)
+                {
+                    continue;
+                }
+
                 viewModel = new DeviceViewModel(OnDeviceRuleChangedAsync);
                 viewModel.Initialize(
                     snapshot,
@@ -215,15 +237,20 @@ public partial class MainWindow : Window
             {
                 viewModel.Update(snapshot, preferences?.Alias);
             }
+
+            viewModel.SetPresence(presence == DevicePresence.Online);
         }
 
-        var view = CollectionViewSource.GetDefaultView(Devices);
-        var editableView = view as IEditableCollectionView;
-        if (DeviceListRefreshPolicy.ShouldRefresh(
-                Keyboard.FocusedElement is TextBox,
-                editableView?.IsAddingNew == true,
-                editableView?.IsEditingItem == true))
+        if (canMutateView)
         {
+            foreach (var stale in Devices
+                         .Where(device => !visibleKeys.Contains(device.MacKey))
+                         .ToArray())
+            {
+                deviceIndex.Remove(stale.MacKey);
+                Devices.Remove(stale);
+            }
+
             view.Refresh();
         }
 

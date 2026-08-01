@@ -21,7 +21,22 @@ public sealed class DeviceRegistry
         IPAddress ipAddress,
         PhysicalAddress macAddress,
         DateTimeOffset seenAt,
-        string? hostName = null)
+        string? hostName = null) =>
+        AddOrUpdate(ipAddress, macAddress, seenAt, hostName, refreshLastSeen: true);
+
+    public void Remember(
+        IPAddress ipAddress,
+        PhysicalAddress macAddress,
+        DateTimeOffset rememberedAt,
+        string? hostName = null) =>
+        AddOrUpdate(ipAddress, macAddress, rememberedAt, hostName, refreshLastSeen: false);
+
+    private void AddOrUpdate(
+        IPAddress ipAddress,
+        PhysicalAddress macAddress,
+        DateTimeOffset timestamp,
+        string? hostName,
+        bool refreshLastSeen)
     {
         ArgumentNullException.ThrowIfNull(ipAddress);
         ArgumentNullException.ThrowIfNull(macAddress);
@@ -33,13 +48,17 @@ public sealed class DeviceRegistry
                 MacAddress = macAddress,
                 IpAddress = ipAddress,
                 HostName = hostName,
-                FirstSeen = seenAt,
-                LastSeen = seenAt,
+                FirstSeen = timestamp,
+                LastSeen = timestamp,
             },
             (_, existing) =>
             {
                 existing.IpAddress = ipAddress;
-                existing.LastSeen = seenAt;
+                if (refreshLastSeen)
+                {
+                    existing.LastSeen = timestamp;
+                }
+
                 if (!string.IsNullOrWhiteSpace(hostName))
                 {
                     existing.HostName = hostName;
@@ -63,7 +82,11 @@ public sealed class DeviceRegistry
         }
     }
 
-    public void RecordTraffic(PhysicalAddress macAddress, TrafficDirection direction, int byteCount)
+    public void RecordTraffic(
+        PhysicalAddress macAddress,
+        TrafficDirection direction,
+        int byteCount,
+        DateTimeOffset? seenAt = null)
     {
         if (byteCount <= 0)
         {
@@ -75,6 +98,8 @@ public sealed class DeviceRegistry
         {
             return;
         }
+
+        record.LastSeen = seenAt ?? DateTimeOffset.UtcNow;
 
         if (direction == TrafficDirection.Download)
         {
