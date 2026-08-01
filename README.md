@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/lantern-control-social-preview.png" alt="LANtern Control — Local Network Visibility &amp; Control" width="100%">
+</p>
+
 # LANtern Control
 
 LANtern Control is a native Windows application for discovering devices and
@@ -79,3 +83,7 @@ dotnet test .\tests\Lantern.Core.Tests\Lantern.Core.Tests.csproj
 ```
 
 The self-contained executable is written to `release\LANtern-Control.exe`.
+
+---
+
+**This Project Was VibeCoded**
