@@ -807,6 +807,17 @@ public sealed class PcapLanEngine : IAsyncDisposable
         AdapterProfile activeProfile,
         PhysicalAddress activeGatewayMac)
     {
+        var restoreFrames = ArpInterceptionFrames.BuildRestore(
+            activeProfile.LocalMac,
+            activeProfile.GatewayAddress,
+            activeGatewayMac,
+            client.Key,
+            client.Value);
+        SendArpPacket(restoreFrames.ToClient);
+        SendArpPacket(restoreFrames.ToGateway);
+
+        // Also ask a connected client to answer the gateway itself. The direct
+        // replies above cover clients that disconnected before restoration.
         var recoveryRequest = ArpInterceptionFrames.BuildRecoveryRequest(
             activeProfile.LocalMac,
             activeGatewayMac,
@@ -814,15 +825,6 @@ public sealed class PcapLanEngine : IAsyncDisposable
             client.Value,
             client.Key);
         SendArpPacket(recoveryRequest);
-        var controllerFrames = ArpInterceptionFrames.BuildControllerProtection(
-            activeProfile.LocalMac,
-            activeProfile.LocalAddress,
-            activeGatewayMac,
-            activeProfile.GatewayAddress,
-            client.Value,
-            client.Key);
-        SendArpPacket(controllerFrames.ClientToController);
-        SendArpPacket(controllerFrames.GatewayToController);
     }
 
     private void RespondToArpRequest(ArpFrameInfo request)

@@ -77,6 +77,31 @@ public sealed class ArpInterceptionFramesTests
     }
 
     [Fact]
+    public void BuildRestore_AdvertisesTheRealPeersToBothSides()
+    {
+        var frames = ArpInterceptionFrames.BuildRestore(
+            LocalMac,
+            GatewayIp,
+            GatewayMac,
+            ClientIp,
+            ClientMac);
+
+        Assert.True(EthernetFrameCodec.TryParseArp(frames.ToGateway, out var toGateway));
+        Assert.Equal(LocalMac, toGateway.EthernetSourceMac);
+        Assert.Equal(ClientMac, toGateway.SenderMac);
+        Assert.Equal(ClientIp, toGateway.SenderIp);
+        Assert.Equal(GatewayMac, toGateway.TargetMac);
+        Assert.Equal(GatewayIp, toGateway.TargetIp);
+
+        Assert.True(EthernetFrameCodec.TryParseArp(frames.ToClient, out var toClient));
+        Assert.Equal(LocalMac, toClient.EthernetSourceMac);
+        Assert.Equal(GatewayMac, toClient.SenderMac);
+        Assert.Equal(GatewayIp, toClient.SenderIp);
+        Assert.Equal(ClientMac, toClient.TargetMac);
+        Assert.Equal(ClientIp, toClient.TargetIp);
+    }
+
+    [Fact]
     public void Select_ClientTargetOmitsTheGatewayPoisonFrame()
     {
         var frames = ArpInterceptionFrames.BuildPoison(
