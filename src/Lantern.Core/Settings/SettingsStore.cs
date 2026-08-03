@@ -8,6 +8,8 @@ namespace Lantern.Core.Settings;
 
 public sealed class SettingsStore
 {
+    private const int PrimaryLoadAttempts = 6;
+    private static readonly TimeSpan PrimaryLoadRetryDelay = TimeSpan.FromMilliseconds(50);
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> SaveLocks =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -19,6 +21,7 @@ public sealed class SettingsStore
 
     private readonly string directory;
     private readonly string settingsPath;
+    private readonly string backupPath;
 
     public SettingsStore(string? directory = null)
     {
@@ -27,6 +30,7 @@ public sealed class SettingsStore
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "LANternControl");
         settingsPath = Path.Combine(this.directory, "settings.json");
+        backupPath = Path.Combine(this.directory, "settings.backup.json");
     }
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
@@ -35,25 +39,12 @@ public sealed class SettingsStore
         await pathLock.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(settingsPath))
-            {
-                return new AppSettings();
-            }
-
-            await using var stream = File.OpenRead(settingsPath);
-            var loaded = await JsonSerializer.DeserializeAsync<AppSettings>(
-                stream,
-                JsonOptions,
-                cancellationToken);
+            var loaded = await TryLoadAsync(
+                    settingsPath,
+                    PrimaryLoadAttempts,
+                    cancellationToken) ??
+                await TryLoadAsync(backupPath, attempts: 1, cancellationToken);
             return Normalize(loaded ?? new AppSettings());
-        }
-        catch (JsonException)
-        {
-            return new AppSettings();
-        }
-        catch (IOException)
-        {
-            return new AppSettings();
         }
         finally
         {
@@ -72,6 +63,9 @@ public sealed class SettingsStore
         {
             Directory.CreateDirectory(directory);
             var temporaryPath = Path.Combine(directory, $"settings-{Guid.NewGuid():N}.tmp");
+            var backupTemporaryPath = Path.Combine(
+                directory,
+                $"settings-backup-{Guid.NewGuid():N}.tmp");
             try
             {
                 await using (var stream = new FileStream(
@@ -90,6 +84,8 @@ public sealed class SettingsStore
                     await stream.FlushAsync(cancellationToken);
                 }
 
+                File.Copy(temporaryPath, backupTemporaryPath);
+                File.Move(backupTemporaryPath, backupPath, overwrite: true);
                 File.Move(temporaryPath, settingsPath, overwrite: true);
             }
             finally
@@ -97,6 +93,11 @@ public sealed class SettingsStore
                 if (File.Exists(temporaryPath))
                 {
                     File.Delete(temporaryPath);
+                }
+
+                if (File.Exists(backupTemporaryPath))
+                {
+                    File.Delete(backupTemporaryPath);
                 }
             }
         }
@@ -110,6 +111,49 @@ public sealed class SettingsStore
         SaveLocks.GetOrAdd(
             Path.GetFullPath(settingsPath),
             static _ => new SemaphoreSlim(1, 1));
+
+    private static async Task<AppSettings?> TryLoadAsync(
+        string path,
+        int attempts,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                await using var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    bufferSize: 4096,
+                    useAsync: true);
+                return await JsonSerializer.DeserializeAsync<AppSettings>(
+                    stream,
+                    JsonOptions,
+                    cancellationToken);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+            catch (IOException) when (attempt < attempts)
+            {
+                await Task.Delay(PrimaryLoadRetryDelay, cancellationToken);
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
 
     private static AppSettings Normalize(AppSettings settings)
     {

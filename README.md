@@ -161,6 +161,10 @@ Windows: %LOCALAPPDATA%\LANternControl\settings.json
 Linux:   ~/.local/share/LANternControl/settings.json
 ```
 
+LANtern also maintains `settings.backup.json` beside the primary file so a
+temporary file lock or interrupted update cannot replace saved device names,
+limits, presets, or domain rules with an empty configuration.
+
 No router username or password is required, and LANtern does not permanently
 change the router configuration.
 

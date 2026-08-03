@@ -136,6 +136,97 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public async Task Load_PrimaryFileTemporarilyLocked_RestoresTheLastSavedSettings()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var store = new SettingsStore(directory);
+            await store.SaveAsync(new AppSettings
+            {
+                Devices =
+                {
+                    ["0E4F69CCE4F0"] = new DevicePreferences
+                    {
+                        LearnedHostName = "POCO-F6",
+                        DownloadKiloBytesPerSecond = 500,
+                        UploadKiloBytesPerSecond = 100,
+                    },
+                },
+                BlockedDomains =
+                {
+                    ["0E4F69CCE4F0"] = ["youtube.com"],
+                },
+            });
+
+            await using var exclusiveLock = new FileStream(
+                Path.Combine(directory, "settings.json"),
+                FileMode.Open,
+                FileAccess.ReadWrite,
+                FileShare.None);
+
+            var loaded = await store.LoadAsync();
+
+            var device = Assert.Single(loaded.Devices).Value;
+            Assert.Equal("POCO-F6", device.LearnedHostName);
+            Assert.Equal(500, device.DownloadKiloBytesPerSecond);
+            Assert.Equal(100, device.UploadKiloBytesPerSecond);
+            Assert.Equal(["youtube.com"], Assert.Single(loaded.BlockedDomains).Value);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Load_PreBackupSettingsTemporarilyLocked_WaitsForTheExistingSettingsFile()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var settingsPath = Path.Combine(directory, "settings.json");
+            await File.WriteAllTextAsync(
+                settingsPath,
+                """
+                {
+                  "devices": {
+                    "0E4F69CCE4F0": {
+                      "learnedHostName": "POCO-F6",
+                      "downloadKiloBytesPerSecond": 500,
+                      "uploadKiloBytesPerSecond": 100,
+                      "pauseInternet": false,
+                      "lastKnownIp": "192.168.31.213"
+                    }
+                  },
+                  "blockedDomains": {
+                    "0E4F69CCE4F0": ["youtube.com"]
+                  },
+                  "appliedDomainPresets": {}
+                }
+                """);
+            var exclusiveLock = new FileStream(
+                settingsPath,
+                FileMode.Open,
+                FileAccess.ReadWrite,
+                FileShare.None);
+            var store = new SettingsStore(directory);
+
+            var loadTask = store.LoadAsync();
+            await Task.Delay(100);
+            await exclusiveLock.DisposeAsync();
+            var loaded = await loadTask;
+
+            Assert.Equal("POCO-F6", Assert.Single(loaded.Devices).Value.LearnedHostName);
+            Assert.Equal(["youtube.com"], Assert.Single(loaded.BlockedDomains).Value);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Load_MalformedJsonReturnsEmptySettings()
     {
         var directory = CreateTemporaryDirectory();
