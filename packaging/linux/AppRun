@@ -1,0 +1,81 @@
+#!/usr/bin/env sh
+set -eu
+
+app_dir=${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}
+version_file="$app_dir/usr/share/lantern-control/version"
+payload_file="$app_dir/usr/share/lantern-control/payload.sha256"
+
+show_error() {
+  message=$1
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --error --title="LANtern Control" --text="$message" || true
+  elif command -v kdialog >/dev/null 2>&1; then
+    kdialog --error "$message" --title "LANtern Control" || true
+  elif command -v xmessage >/dev/null 2>&1; then
+    xmessage -center "LANtern Control: $message" || true
+  fi
+  printf '%s\n' "$message" >&2
+}
+
+if [ ! -r "$version_file" ] || [ ! -r "$payload_file" ]; then
+  show_error "This AppImage is incomplete. Download LANtern Control again."
+  exit 1
+fi
+
+version=$(cat "$version_file")
+payload_hash=$(cat "$payload_file")
+install_dir="/opt/lantern-control/$version"
+installed_hash=
+if [ -r "$install_dir/usr/share/lantern-control/payload.sha256" ]; then
+  installed_hash=$(cat "$install_dir/usr/share/lantern-control/payload.sha256")
+fi
+
+if [ ! -x "$install_dir/usr/bin/LANtern-Control" ] || [ "$installed_hash" != "$payload_hash" ]; then
+  if [ "$(id -u)" -eq 0 ]; then
+    "$app_dir/usr/libexec/lantern-control/install-privileged" "$app_dir" "$version"
+  else
+    if ! command -v pkexec >/dev/null 2>&1; then
+      show_error "Administrator setup needs Polkit (pkexec). Install policykit-1, then open the AppImage again."
+      exit 1
+    fi
+
+    # Polkit runs the helper as root, but AppImage's FUSE mount is accessible
+    # only to the desktop user. Stage the payload on the normal filesystem so
+    # the privileged process can read it without running the whole GUI as root.
+    bootstrap_dir=$(mktemp -d "${TMPDIR:-/tmp}/lantern-control-bootstrap.XXXXXX")
+    setup_log=$(mktemp "${TMPDIR:-/tmp}/lantern-control-setup.XXXXXX")
+    cleanup_bootstrap() {
+      if [ -n "${bootstrap_dir:-}" ] && [ -d "$bootstrap_dir" ]; then
+        rm -rf -- "$bootstrap_dir"
+      fi
+      if [ -n "${setup_log:-}" ] && [ -f "$setup_log" ]; then
+        rm -f -- "$setup_log"
+      fi
+    }
+    trap cleanup_bootstrap EXIT HUP INT TERM
+    mkdir -p "$bootstrap_dir/usr"
+    cp -R -- "$app_dir/usr/." "$bootstrap_dir/usr/"
+
+    if ! pkexec /bin/sh "$bootstrap_dir/usr/libexec/lantern-control/install-privileged" "$bootstrap_dir" "$version" >"$setup_log" 2>&1; then
+      setup_failure=$(tail -n 8 "$setup_log")
+      if [ -z "$setup_failure" ]; then
+        setup_failure="The privileged installer exited without an error message."
+      fi
+      show_error "$(printf 'Administrator setup failed:\n%s\n\nNo system changes were kept.' "$setup_failure")"
+      exit 1
+    fi
+
+    cleanup_bootstrap
+    bootstrap_dir=
+    setup_log=
+  fi
+fi
+
+if [ ! -x "$install_dir/usr/bin/LANtern-Control" ]; then
+  show_error "The protected LANtern Control installation could not be opened."
+  exit 1
+fi
+
+export LD_LIBRARY_PATH="$install_dir/usr/lib:$install_dir/usr/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="$install_dir/usr/bin${PATH:+:$PATH}"
+exec "$install_dir/usr/bin/LANtern-Control" "$@"

@@ -94,6 +94,7 @@ public sealed class DeviceViewModelTests
                         "MaximizeWindowButton",
                         "CloseWindowButton",
                         "Sidebar",
+                        "SidebarVersionText",
                         "BrandLogo",
                         "OverviewNavButton",
                         "ActivityNavButton",
@@ -125,6 +126,10 @@ public sealed class DeviceViewModelTests
                         Assert.NotNull(window.FindName(name));
                     }
 
+                    var sidebarVersion = Assert.IsType<TextBlock>(
+                        window.FindName("SidebarVersionText"));
+                    Assert.Equal("v0.1.3", sidebarVersion.Text);
+
                     var minimizeButton = Assert.IsType<Button>(
                         window.FindName("MinimizeWindowButton"));
                     minimizeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -141,9 +146,11 @@ public sealed class DeviceViewModelTests
                     Assert.Null(window.FindName("AdapterNavButton"));
 
                     var adapterStrip = Assert.IsType<Border>(window.FindName("AdapterStrip"));
-                    Assert.True(
-                        adapterStrip.Margin.Left >= 12,
-                        "The network adapter card must not touch the left content border.");
+                    var activitySection = Assert.IsType<Border>(
+                        window.FindName("ActivitySection"));
+                    Assert.Equal(
+                        activitySection.Margin.Left,
+                        adapterStrip.Margin.Left);
 
                     var adapterSelector = Assert.IsType<ComboBox>(
                         window.FindName("AdapterSelector"));
@@ -239,7 +246,28 @@ public sealed class DeviceViewModelTests
 
                     var chart = Assert.IsType<Lantern.App.Controls.LiveTrafficChart>(
                         window.FindName("TrafficChart"));
-                    Assert.Equal(TimeSpan.FromHours(1), chart.VisibleDuration);
+                    Assert.Equal(TimeSpan.FromMinutes(10), chart.VisibleDuration);
+                    Assert.Equal(238, chart.Height);
+                    Assert.True(
+                        chart.ClipToBounds,
+                        "The traffic chart must clip strokes and markers inside its own drawing surface.");
+                    var deviceGrid = Assert.IsType<DataGrid>(window.FindName("DeviceGrid"));
+                    Assert.Equal(68, deviceGrid.RowHeight);
+                    var deviceColumn = Assert.IsType<DataGridTemplateColumn>(deviceGrid.Columns[0]);
+                    var deviceIdentity = Assert.IsType<Grid>(deviceColumn.CellTemplate!.LoadContent());
+                    Assert.Equal(new GridLength(36), deviceIdentity.ColumnDefinitions[0].Width);
+                    var deviceNameEditor = Assert.IsType<TextBox>(
+                        deviceIdentity.FindName("DeviceNameEditor"));
+                    Assert.Equal(18, deviceNameEditor.Height);
+                    Assert.Equal(18, deviceNameEditor.MinHeight);
+                    Assert.Equal(new Thickness(0), deviceNameEditor.Margin);
+                    Assert.Equal(new Thickness(0), deviceNameEditor.Padding);
+                    var deviceMetadata = Assert.IsType<StackPanel>(
+                        deviceIdentity.FindName("DeviceMetadata"));
+                    Assert.Equal(new Thickness(0), deviceMetadata.Margin);
+                    var macAddress = Assert.IsType<TextBlock>(
+                        deviceIdentity.FindName("DeviceMacAddress"));
+                    Assert.Equal(9, macAddress.FontSize);
                     var xaml = File.ReadAllText(Path.Combine(
                         GetProjectRoot(),
                         "src",
@@ -261,7 +289,7 @@ public sealed class DeviceViewModelTests
                         96,
                         System.Windows.Media.PixelFormats.Pbgra32);
                     emptyChartBitmap.Render(chart);
-                    var grid = Assert.IsType<DataGrid>(window.FindName("DeviceGrid"));
+                    var grid = deviceGrid;
                     foreach (var header in new[] { "DOWN LIMIT", "UP LIMIT" })
                     {
                         var column = Assert.IsType<DataGridTemplateColumn>(
@@ -347,6 +375,31 @@ public sealed class DeviceViewModelTests
                     Assert.Equal(
                         new[] { "Phone A", "Phone B", "Gateway" },
                         deviceView.Cast<DeviceViewModel>().Select(device => device.DisplayName));
+
+                    var topStatus = Assert.IsType<TextBlock>(window.FindName("TopStatusText"));
+                    var uptime = Assert.IsType<TextBlock>(window.FindName("UptimeText"));
+                    topStatus.Text = "Active";
+                    uptime.Text = "Active 00:36:10";
+                    var refreshTimer = Assert.IsType<System.Windows.Threading.DispatcherTimer>(
+                        typeof(MainWindow)
+                            .GetField(
+                                "refreshTimer",
+                                System.Reflection.BindingFlags.Instance |
+                                System.Reflection.BindingFlags.NonPublic)!
+                            .GetValue(window));
+                    refreshTimer.Start();
+                    var applyEngineState = typeof(MainWindow).GetMethod(
+                        "ApplyEngineState",
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic);
+                    Assert.NotNull(applyEngineState);
+                    applyEngineState.Invoke(window, [false]);
+
+                    Assert.Equal("Idle", topStatus.Text);
+                    Assert.Equal("Idle", uptime.Text);
+                    Assert.False(refreshTimer.IsEnabled);
+                    Assert.Equal(Visibility.Visible, Assert.IsType<Button>(window.FindName("StartButton")).Visibility);
+                    Assert.Equal(Visibility.Collapsed, Assert.IsType<Button>(window.FindName("StopButton")).Visibility);
 
                     window.Close();
                 }

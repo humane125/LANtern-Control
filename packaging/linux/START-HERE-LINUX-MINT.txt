@@ -1,0 +1,21 @@
+LANtern Control - Linux Mint persistent USB quick start
+=======================================================
+
+1. Boot Linux Mint from the USB and choose the normal live-session option.
+2. Open Files, open the LINUX MINT volume, then open LANtern-Control-Test.
+3. Right-click the AppImage, choose Properties > Permissions, and enable
+   "Allow executing file as program".
+4. Double-click the AppImage. Approve Linux Mint's graphical administrator
+   prompt once. LANtern installs its protected packet-capture payload under
+   /opt/lantern-control; the desktop GUI itself still runs as your user.
+5. Future launches work by double-clicking without a terminal or password.
+
+6. In LANtern, select the adapter whose gateway is your router, click Start
+    control, then click Refresh devices.
+
+Always click Stop & restore before closing LANtern, disconnecting the adapter,
+changing networks, suspending, or rebooting.
+
+This is a local Linux test build. It has compiled and passed the automated
+Linux/shared tests, but live ARP forwarding and libpcap behavior must be tested
+on the actual Mint network.

@@ -48,16 +48,25 @@ public partial class MainWindow : Window
     private bool closeAfterStop;
     private bool settingsDirty;
 
+    public string VersionText =>
+        $"v{(typeof(MainWindow).Assembly.GetName().Version ?? new Version()).ToString(3)}";
+
     public MainWindow()
     {
         InitializeComponent();
         DataContext = this;
+        SidebarVersionText.Text = VersionText;
         DomainPresetSelector.ItemsSource = DomainPresets;
         engine = new PcapLanEngine(registry, policy);
         engine.StatusChanged += Engine_OnStatusChanged;
+        engine.StateChanged += Engine_OnStateChanged;
         engine.DeviceIdentityLearned += Engine_OnDeviceIdentityLearned;
         engine.DeviceDomainObserved += Engine_OnDeviceDomainObserved;
-        refreshTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, RefreshDevices, Dispatcher);
+        refreshTimer = new DispatcherTimer(
+            TrafficSamplingProfile.Interval,
+            DispatcherPriority.Background,
+            RefreshDevices,
+            Dispatcher);
         Loaded += MainWindow_OnLoaded;
         Closing += MainWindow_OnClosing;
 
@@ -134,7 +143,9 @@ public partial class MainWindow : Window
         try
         {
             var installedVersion = typeof(MainWindow).Assembly.GetName().Version ?? new Version();
-            var available = await updateChecker.CheckAsync(installedVersion);
+            var available = await updateChecker.CheckAsync(
+                installedVersion,
+                UpdatePlatform.WindowsX64);
             await settingsStore.SaveAsync(settings);
             settingsDirty = false;
             if (available is null)
@@ -181,6 +192,7 @@ public partial class MainWindow : Window
         SetStatus("Starting packet capture…", null);
         try
         {
+            ClearObservedActivity();
             ApplyAllSavedRules();
             UpdateKnownDeviceHints();
             await engine.StartAsync(selected, CancellationToken.None);
@@ -244,15 +256,17 @@ public partial class MainWindow : Window
 
     private void ClearActivityButton_OnClick(object sender, RoutedEventArgs eventArgs)
     {
+        ClearObservedActivity();
+        DetailStatusText.Text = "Website activity cleared from this session.";
+    }
+
+    private void ClearObservedActivity()
+    {
         websiteActivityIndex.Clear();
         WebsiteActivity.Clear();
-        foreach (var group in websiteActivityGroupIndex.Values)
-        {
-            group.ClearDomains();
-        }
-
+        websiteActivityGroupIndex.Clear();
+        DeviceActivityGroups.Clear();
         RefreshWebsiteActivityState();
-        DetailStatusText.Text = "Website activity cleared from this session.";
     }
 
     private void Engine_OnDeviceDomainObserved(
@@ -902,26 +916,9 @@ public partial class MainWindow : Window
 
     private void UpdateKnownDeviceHints()
     {
-        var hints = new List<KnownDeviceHint>();
-        foreach (var pair in settings.Devices)
-        {
-            try
-            {
-                var mac = PhysicalAddress.Parse(pair.Key);
-                var lastKnownIp = IPAddress.TryParse(pair.Value.LastKnownIp, out var parsed)
-                    ? parsed
-                    : null;
-                hints.Add(new KnownDeviceHint(
-                    mac,
-                    lastKnownIp,
-                    pair.Value.LearnedHostName));
-            }
-            catch (FormatException)
-            {
-            }
-        }
-
-        engine.ReplaceKnownDeviceHints(hints);
+        engine.ReplaceKnownDeviceHints(KnownDeviceHintFactory.Build(settings));
+        engine.ReplaceRejectedResolvedNames(
+            KnownDeviceHintFactory.FindAmbiguousLearnedNames(settings));
     }
 
     private async Task SaveSettingsIfDirtyAsync()
@@ -938,6 +935,39 @@ public partial class MainWindow : Window
     private void Engine_OnStatusChanged(object? sender, string message)
     {
         _ = Dispatcher.InvokeAsync(() => DetailStatusText.Text = message);
+    }
+
+    private void Engine_OnStateChanged(
+        object? sender,
+        PcapEngineStateChangedEventArgs eventArgs)
+    {
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            ApplyEngineState(eventArgs.IsRunning);
+            DetailStatusText.Text = eventArgs.StatusMessage;
+        });
+    }
+
+    private void ApplyEngineState(bool isRunning)
+    {
+        if (isRunning)
+        {
+            controlStartedAt ??= DateTimeOffset.UtcNow;
+            refreshTimer.Start();
+            TopStatusText.Text = "Active";
+            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(104, 192, 138));
+        }
+        else
+        {
+            refreshTimer.Stop();
+            controlStartedAt = null;
+            UptimeText.Text = "Idle";
+            TopStatusText.Text = "Idle";
+            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(168, 144, 149));
+        }
+
+        UpdateButtons();
+        RefreshDashboardSummary(addTrafficSample: false);
     }
 
     private void Engine_OnDeviceIdentityLearned(
@@ -1106,14 +1136,7 @@ public partial class MainWindow : Window
 
         if (addTrafficSample && engine.IsRunning)
         {
-            var sample = new TrafficSample(
-                DateTimeOffset.UtcNow,
-                summary.DownloadBytesPerSecond,
-                summary.UploadBytesPerSecond,
-                summary.TopDeviceName,
-                summary.TopDeviceDownloadBytesPerSecond,
-                summary.TopDeviceUploadBytesPerSecond,
-                summary.DeviceTraffic);
+            var sample = summary.ToTrafficSample(DateTimeOffset.UtcNow);
             if (trafficHistory.TryAdd(sample, TrafficSamplingProfile.Interval))
             {
                 TrafficChart.Samples = trafficHistory.Samples;

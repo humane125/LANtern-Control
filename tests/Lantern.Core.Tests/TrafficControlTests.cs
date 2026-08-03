@@ -268,6 +268,21 @@ public sealed class TrafficControlTests
         Assert.Equal(trafficAt, snapshot.LastSeen);
     }
 
+    [Fact]
+    public void DeviceRegistry_BeginSessionRemovesStaleNamesAndAddresses()
+    {
+        var registry = new DeviceRegistry();
+        registry.Observe(
+            IPAddress.Parse("192.168.31.213"),
+            PhysicalAddress.Parse("0E4F69CCE4F0"),
+            DateTimeOffset.UtcNow,
+            "Humane");
+
+        registry.BeginSession();
+
+        Assert.Empty(registry.Peek());
+    }
+
     private sealed class ManualClock
     {
         public double Seconds { get; set; }

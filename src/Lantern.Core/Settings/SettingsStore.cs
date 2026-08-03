@@ -1,12 +1,16 @@
 using System.Text.Json;
 using System.Net;
 using System.Net.Sockets;
+using System.Collections.Concurrent;
 using Lantern.Core.Control;
 
 namespace Lantern.Core.Settings;
 
 public sealed class SettingsStore
 {
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> SaveLocks =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -27,13 +31,15 @@ public sealed class SettingsStore
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(settingsPath))
-        {
-            return new AppSettings();
-        }
-
+        var pathLock = GetPathLock();
+        await pathLock.WaitAsync(cancellationToken);
         try
         {
+            if (!File.Exists(settingsPath))
+            {
+                return new AppSettings();
+            }
+
             await using var stream = File.OpenRead(settingsPath);
             var loaded = await JsonSerializer.DeserializeAsync<AppSettings>(
                 stream,
@@ -49,6 +55,10 @@ public sealed class SettingsStore
         {
             return new AppSettings();
         }
+        finally
+        {
+            pathLock.Release();
+        }
     }
 
     public async Task SaveAsync(
@@ -56,36 +66,50 @@ public sealed class SettingsStore
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        Directory.CreateDirectory(directory);
-        var temporaryPath = Path.Combine(directory, $"settings-{Guid.NewGuid():N}.tmp");
+        var saveLock = GetPathLock();
+        await saveLock.WaitAsync(cancellationToken);
         try
         {
-            await using (var stream = new FileStream(
-                temporaryPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: 4096,
-                useAsync: true))
+            Directory.CreateDirectory(directory);
+            var temporaryPath = Path.Combine(directory, $"settings-{Guid.NewGuid():N}.tmp");
+            try
             {
-                await JsonSerializer.SerializeAsync(
-                    stream,
-                    Normalize(settings),
-                    JsonOptions,
-                    cancellationToken);
-                await stream.FlushAsync(cancellationToken);
-            }
+                await using (var stream = new FileStream(
+                    temporaryPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 4096,
+                    useAsync: true))
+                {
+                    await JsonSerializer.SerializeAsync(
+                        stream,
+                        Normalize(settings),
+                        JsonOptions,
+                        cancellationToken);
+                    await stream.FlushAsync(cancellationToken);
+                }
 
-            File.Move(temporaryPath, settingsPath, overwrite: true);
+                File.Move(temporaryPath, settingsPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
         }
         finally
         {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
+            saveLock.Release();
         }
     }
+
+    private SemaphoreSlim GetPathLock() =>
+        SaveLocks.GetOrAdd(
+            Path.GetFullPath(settingsPath),
+            static _ => new SemaphoreSlim(1, 1));
 
     private static AppSettings Normalize(AppSettings settings)
     {

@@ -1,0 +1,164 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Lantern.Linux.Controls"
+        x:Class="Lantern.Linux.UpdatePromptWindow"
+        Title="LANtern Control update"
+        Width="560"
+        Height="390"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        Foreground="#F4EEF0"
+        FontFamily="Inter"
+        Icon="avares://LANtern%20Control/Assets/lantern-control.png">
+  <Window.Styles>
+    <Style Selector="Button.action">
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="Padding" Value="14,9" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="#F4EEF0" />
+      <Setter Property="Background" Value="#171317" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="Button.action:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#21171B" />
+      <Setter Property="BorderBrush" Value="#70404A" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#261014" />
+      <Setter Property="BorderBrush" Value="#D72C43" />
+    </Style>
+    <Style Selector="Button.quiet">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="#A89095" />
+    </Style>
+  </Window.Styles>
+
+  <Border Margin="18"
+          CornerRadius="18"
+          Background="#08090B"
+          BorderBrush="#6E1828"
+          BorderThickness="1"
+          BoxShadow="0 8 30 0 #A6000000">
+    <Grid RowDefinitions="42,*">
+      <Border Grid.Row="0"
+              CornerRadius="18,18,0,0"
+              Background="#0D0B0E"
+              BorderBrush="#2B2226"
+              BorderThickness="0,0,0,1"
+              PointerPressed="TitleBar_OnPointerPressed">
+        <Grid>
+          <StackPanel Margin="16,0,0,0"
+                      Orientation="Horizontal"
+                      VerticalAlignment="Center">
+            <Ellipse Width="7" Height="7" Fill="#D72C43" />
+            <TextBlock Margin="9,0,0,0"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Text="LANtern Control  •  Update signal" />
+          </StackPanel>
+          <Button Width="42"
+                  Height="34"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Top"
+                  Padding="0"
+                  Background="Transparent"
+                  BorderBrush="Transparent"
+                  Foreground="#F4EEF0"
+                  FontSize="20"
+                  Content="×"
+                  Click="NotNowButton_OnClick" />
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="1" Margin="28,22,28,24"
+            ColumnDefinitions="118,*"
+            RowDefinitions="*,Auto">
+        <Border Width="104"
+                Height="104"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                CornerRadius="26"
+                Background="#1B0A0F"
+                BorderBrush="#7F1729"
+                BorderThickness="1">
+          <controls:RedWatcherLogo Margin="8" />
+        </Border>
+
+        <StackPanel Grid.Column="1" Margin="10,3,0,0">
+          <TextBlock Foreground="#D72C43"
+                     FontSize="10"
+                     FontWeight="SemiBold"
+                     Text="NEW VERSION DETECTED" />
+          <TextBlock Margin="0,7,0,0"
+                     FontSize="27"
+                     FontWeight="Bold"
+                     Text="A new signal is live." />
+          <TextBlock Margin="0,9,0,0"
+                     Foreground="#A89095"
+                     FontSize="13"
+                     LineHeight="20"
+                     TextWrapping="Wrap"
+                     Text="A newer LANtern Control release is available on GitHub.&#10;Review the release and choose when you want to install it." />
+          <Border Margin="0,16,0,0"
+                  Padding="13,10"
+                  CornerRadius="8"
+                  Background="#0C0B0D"
+                  BorderBrush="#2B2226"
+                  BorderThickness="1">
+            <Grid ColumnDefinitions="*,Auto,*">
+              <StackPanel>
+                <TextBlock Foreground="#A89095" FontSize="9" Text="INSTALLED" />
+                <TextBlock x:Name="InstalledVersionText"
+                           Margin="0,3,0,0"
+                           FontWeight="SemiBold" />
+              </StackPanel>
+              <TextBlock Grid.Column="1"
+                         Margin="15,0"
+                         VerticalAlignment="Center"
+                         Foreground="#D72C43"
+                         FontSize="18"
+                         Text="→" />
+              <StackPanel Grid.Column="2">
+                <TextBlock Foreground="#A89095" FontSize="9" Text="AVAILABLE" />
+                <TextBlock x:Name="AvailableVersionText"
+                           Margin="0,3,0,0"
+                           Foreground="#D72C43"
+                           FontWeight="Bold" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </StackPanel>
+
+        <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,24,0,0"
+              ColumnDefinitions="Auto,*,Auto,Auto">
+          <Button x:Name="NeverAskAgainButton"
+                  Classes="action quiet"
+                  Content="Never ask again"
+                  Click="NeverAskAgainButton_OnClick" />
+          <Button x:Name="NotNowButton"
+                  Grid.Column="2"
+                  Classes="action"
+                  MinWidth="104"
+                  Margin="0,0,10,0"
+                  Content="Not now"
+                  Click="NotNowButton_OnClick" />
+          <Button x:Name="ViewUpdateButton"
+                  Grid.Column="3"
+                  Classes="action primary"
+                  MinWidth="136"
+                  Content="View update"
+                  Click="UpdateButton_OnClick" />
+        </Grid>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

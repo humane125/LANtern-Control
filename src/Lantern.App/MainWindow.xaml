@@ -363,6 +363,13 @@
                 BorderBrush="{StaticResource Border}"
                 BorderThickness="0,0,1,0">
             <DockPanel Margin="18,24">
+                <TextBlock x:Name="SidebarVersionText"
+                           DockPanel.Dock="Bottom"
+                           Margin="14,0,0,2"
+                           Text="{Binding VersionText}"
+                           Foreground="{StaticResource SecondaryText}"
+                           FontSize="10"
+                           Opacity="0.72" />
                 <StackPanel DockPanel.Dock="Top">
                     <StackPanel Margin="2,0,0,34" Orientation="Horizontal">
                         <Border Width="54"
@@ -539,7 +546,7 @@
                 </Grid>
 
                 <Border x:Name="AdapterStrip"
-                        Margin="12,24,12,18"
+                        Margin="0,24,12,18"
                         Padding="22"
                         Style="{StaticResource CardBorderStyle}">
                     <Grid>
@@ -1597,6 +1604,7 @@
                             <DataGrid x:Name="DeviceGrid"
                                       MinHeight="270"
                                       MaxHeight="430"
+                                      RowHeight="68"
                                       ItemsSource="{Binding Devices}"
                                       AutoGenerateColumns="False"
                                       AlternationCount="2"
@@ -1606,7 +1614,7 @@
                                     <DataGridTemplateColumn Header="DEVICE" Width="2.2*">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                <Grid Margin="14,0,10,0" VerticalAlignment="Center">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="36" />
                                                         <ColumnDefinition Width="*" />
@@ -1627,7 +1635,11 @@
                                                               Stretch="Uniform" />
                                                     </Border>
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBox Padding="0"
+                                                        <TextBox x:Name="DeviceNameEditor"
+                                                                 Height="18"
+                                                                 MinHeight="18"
+                                                                 Margin="0"
+                                                                 Padding="0"
                                                                  Background="Transparent"
                                                                  BorderThickness="0"
                                                                  CaretBrush="{StaticResource Accent}"
@@ -1635,16 +1647,20 @@
                                                                  FontWeight="SemiBold"
                                                                  Foreground="{StaticResource PrimaryText}"
                                                                  IsEnabled="{Binding CanControl}"
+                                                                 VerticalContentAlignment="Center"
                                                                  Text="{Binding EditableName, UpdateSourceTrigger=PropertyChanged, Delay=350}"
                                                                  ToolTip="Click to rename this device" />
-                                                        <StackPanel Margin="0,2,0,0" Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding MacAddress}"
+                                                        <StackPanel x:Name="DeviceMetadata"
+                                                                    Margin="0"
+                                                                    Orientation="Horizontal">
+                                                            <TextBlock x:Name="DeviceMacAddress"
+                                                                       Text="{Binding MacAddress}"
                                                                        Foreground="{StaticResource SecondaryText}"
-                                                                       FontSize="10" />
+                                                                       FontSize="9" />
                                                             <TextBlock Margin="8,0,0,0"
                                                                        Text="{Binding ProtectedReason}"
                                                                        Foreground="{StaticResource Accent}"
-                                                                       FontSize="10" />
+                                                                       FontSize="9" />
                                                         </StackPanel>
                                                     </StackPanel>
                                                 </Grid>

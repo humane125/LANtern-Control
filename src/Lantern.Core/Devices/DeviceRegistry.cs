@@ -17,6 +17,15 @@ public sealed class DeviceRegistry
         lastSnapshot = startedAt ?? DateTimeOffset.UtcNow;
     }
 
+    public void BeginSession()
+    {
+        devices.Clear();
+        lock (snapshotSync)
+        {
+            lastSnapshot = DateTimeOffset.UtcNow;
+        }
+    }
+
     public void Observe(
         IPAddress ipAddress,
         PhysicalAddress macAddress,

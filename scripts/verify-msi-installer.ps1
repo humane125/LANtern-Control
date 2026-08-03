@@ -36,7 +36,9 @@ $publish = (Get-Content -LiteralPath $PublishScriptPath -Raw) -replace "`r`n", "
 
 $requirements = [ordered]@{
     "WiX 5 SDK" = '<Project Sdk="WixToolset\.Sdk/5\.0\.2">'
+    "intentional same-version ICE suppression" = '<SuppressIces>ICE61</SuppressIces>'
     "embedded MSI cabinet" = '<MediaTemplate[^>]*EmbedCab="yes"'
+    "same-version replacement support" = '<MajorUpgrade[^>]*AllowSameVersionUpgrades="yes"'
     "published application files" = '<Files[^>]*Include="\$\(var\.PublishDir\)\\\*\*"'
     "install-folder and feature UI" = '<ui:WixUI[^>]*Id="WixUI_Mondo"[^>]*InstallDirectory="INSTALLFOLDER"'
     "Start Menu shortcut feature" = '<Feature[^>]*Id="StartMenuShortcutFeature"'
@@ -45,8 +47,19 @@ $requirements = [ordered]@{
     "MSI release artifact" = 'LANtern-Control-Setup-v\$releaseVersion\.msi'
 }
 
+$packageVersion = [regex]::Match($package, '<Package[^>]*?\sVersion="([^"]+)"').Groups[1].Value
+$projectVersion = [regex]::Match($project, '<OutputName>LANtern-Control-Setup-v([^<]+)</OutputName>').Groups[1].Value
+$publishVersion = [regex]::Match($publish, '\$releaseVersion\s*=\s*"([^"]+)"').Groups[1].Value
+$applicationVersion = [regex]::Match($appProject, '<Version>([^<]+)</Version>').Groups[1].Value
+if ([string]::IsNullOrWhiteSpace($packageVersion) -or
+    $packageVersion -ne $projectVersion -or
+    $packageVersion -ne $publishVersion -or
+    $packageVersion -ne $applicationVersion) {
+    throw "Installer versions are inconsistent: package=$packageVersion project=$projectVersion publish=$publishVersion app=$applicationVersion"
+}
+
 foreach ($requirement in $requirements.GetEnumerator()) {
-    $content = if ($requirement.Key -in @("WiX 5 SDK")) {
+    $content = if ($requirement.Key -in @("WiX 5 SDK", "intentional same-version ICE suppression")) {
         $project
     }
     elseif ($requirement.Key -in @("MSI build command", "MSI release artifact")) {

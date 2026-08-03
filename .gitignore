@@ -12,3 +12,8 @@ publish-*/
 **/bin/
 **/obj/
 LanternControl/release/
+outputs/
+staging/
+squashfs-root/
+packaging/wix/
+docs/superpowers/

@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <AssemblyName>LANtern Control</AssemblyName>
+    <RootNamespace>Lantern.Linux</RootNamespace>
+    <Version>0.1.0</Version>
+    <Product>LANtern Control for Linux</Product>
+    <Description>Router-independent IPv4 LAN bandwidth control for Linux.</Description>
+    <Authors>LANtern Control</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.18" />
+    <PackageReference Include="SharpPcap" Version="6.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Lantern.Core\Lantern.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Lantern.App\Services\ClientMappingCache.cs" Link="Shared\ClientMappingCache.cs" />
+    <Compile Include="..\Lantern.App\Services\DeviceDomainObservedEventArgs.cs" Link="Shared\DeviceDomainObservedEventArgs.cs" />
+    <Compile Include="..\Lantern.App\Services\DeviceIdentityLearnedEventArgs.cs" Link="Shared\DeviceIdentityLearnedEventArgs.cs" />
+    <Compile Include="..\Lantern.App\Services\DhcpHostNameParser.cs" Link="Shared\DhcpHostNameParser.cs" />
+    <Compile Include="..\Lantern.App\Services\DiscoveryRefreshResult.cs" Link="Shared\DiscoveryRefreshResult.cs" />
+    <Compile Include="..\Lantern.App\Services\GitHubUpdateChecker.cs" Link="Shared\GitHubUpdateChecker.cs" />
+    <Compile Include="..\Lantern.App\Services\KnownDeviceHint.cs" Link="Shared\KnownDeviceHint.cs" />
+    <Compile Include="..\Lantern.App\Services\KnownDeviceHintFactory.cs" Link="Shared\KnownDeviceHintFactory.cs" />
+    <Compile Include="..\Lantern.App\Services\MdnsNameResolver.cs" Link="Shared\MdnsNameResolver.cs" />
+    <Compile Include="..\Lantern.App\Services\NetBiosNameResolver.cs" Link="Shared\NetBiosNameResolver.cs" />
+    <Compile Include="..\Lantern.App\Services\ResolvedDeviceNameClaims.cs" Link="Shared\ResolvedDeviceNameClaims.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\DashboardSummary.cs" Link="Shared\DashboardSummary.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\DeviceActivityGroupViewModel.cs" Link="Shared\DeviceActivityGroupViewModel.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\DeviceActivityViewModel.cs" Link="Shared\DeviceActivityViewModel.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\DeviceViewModel.cs" Link="Shared\DeviceViewModel.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\DomainPresetRuleViewModel.cs" Link="Shared\DomainPresetRuleViewModel.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\DomainRuleViewModel.cs" Link="Shared\DomainRuleViewModel.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\TrafficHistory.cs" Link="Shared\TrafficHistory.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\TrafficSample.cs" Link="Shared\TrafficSample.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\TrafficSamplingProfile.cs" Link="Shared\TrafficSamplingProfile.cs" />
+    <Compile Include="..\Lantern.App\Controls\TrafficChartPresentation.cs" Link="Shared\TrafficChartPresentation.cs" />
+    <Compile Include="..\Lantern.App\Controls\TrafficChartScale.cs" Link="Shared\TrafficChartScale.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <AvaloniaResource Include="..\..\packaging\linux\lantern-control.png"
+                      Link="Assets\lantern-control.png" />
+  </ItemGroup>
+</Project>

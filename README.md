@@ -2,27 +2,29 @@
   <img src="assets/lantern-control-social-preview.png" alt="LANtern Control — local network visibility and control" width="100%">
 </p>
 
-# LANtern Control — Open-Source SelfishNet Alternative for Windows
+# LANtern Control — Open-Source SelfishNet Alternative for Windows and Linux
 
-<a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.2" src="https://img.shields.io/badge/release-v0.1.2-C51B3A?style=flat-square"></a>
+<a href="https://github.com/humane125/LANtern-Control/releases/latest"><img alt="Release v0.1.3" src="https://img.shields.io/badge/release-v0.1.3-C51B3A?style=flat-square"></a>
 <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-C51B3A?style=flat-square"></a>
 <img alt="C#" src="https://img.shields.io/badge/language-C%23-239120?style=flat-square&amp;logo=csharp">
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&amp;logo=dotnet">
 <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&amp;logo=windows11">
+<img alt="Linux beta" src="https://img.shields.io/badge/Linux-beta-FCC624?style=flat-square&amp;logo=linux&amp;logoColor=black">
 
-LANtern Control is an open-source SelfishNet alternative for Windows: a
-router-independent desktop application for discovering, monitoring, and
-controlling devices on a local IPv4 network. It combines live per-device
-bandwidth monitoring, download and upload limits, internet pause controls, and
+LANtern Control is an open-source SelfishNet, EvilLimiter, and NetCut
+alternative for Windows and Linux. It is a router-independent desktop
+application for discovering, monitoring, and controlling devices on a local
+IPv4 network. It combines live per-device bandwidth monitoring, download and
+upload limits, internet pause controls, visited-domain metadata, and per-device
 domain rules without requiring access to the router's administration dashboard.
 
 If you are looking for a maintained SelfishNet, EvilLimiter, or NetCut
-alternative with a modern Windows interface, LANtern Control is built for that
+alternative with a modern desktop interface, LANtern Control is built for that
 use case.
 
 > [!IMPORTANT]
-> LANtern Control is currently available for Windows. **Linux and macOS are
-> works in progress (WIP).**
+> Windows `v0.1.3` is the stable release. Linux `v0.1.0` is available as a
+> public beta AppImage. **macOS remains a work in progress (WIP).**
 
 ## Features
 
@@ -30,15 +32,16 @@ use case.
 - Resolve device names using DHCP, reverse DNS, NetBIOS, and mDNS information.
 - Remember device names, aliases, and rules between application launches.
 - Display live per-device download and upload speeds.
-- Keep a one-hour network activity chart with one-second samples.
+- Keep a ten-minute network activity chart with 2.5-second samples.
 - Apply independent download and upload limits in `KB/s`.
 - Pause and restore a device's IPv4 internet connection.
 - Observe domains through DNS queries, TLS server names, and plain HTTP host
   headers without decrypting private HTTPS content.
 - Block domains for individual devices, including presets for common services.
 - Restore normal client and router ARP mappings when control stops.
-- Check GitHub Releases for optional application updates.
-- Choose between an installer and a portable ZIP package.
+- Check GitHub Releases for platform-specific optional updates.
+- Install Windows through an MSI or portable ZIP, or run Linux through an
+  AppImage with a one-time graphical privilege setup.
 
 ## Screenshots
 
@@ -59,40 +62,85 @@ from a real network.
 
 ## Requirements
 
+### Windows
+
 - Windows 10 or Windows 11, x64.
 - Administrator access.
 - [Npcap](https://npcap.com/#download) installed on the controller computer.
   WinPcap API-compatible mode is recommended for compatibility.
-- The controller computer and target devices must be on the same IPv4 broadcast
-  network.
-- A stable network connection. Ethernet is recommended; if Wi-Fi is used, keep
-  the controller close enough to the router for a strong signal.
 
 LANtern Control does not include or redistribute Npcap. Install Npcap separately
 from its official website, then restart LANtern Control.
+
+### Linux beta
+
+- A 64-bit x86 Linux desktop. Linux Mint and Ubuntu are the primary tested
+  distributions; other modern distributions may work.
+- Polkit with `pkexec` for the one-time graphical administrator prompt.
+- An AppImage-compatible environment. A FUSE-free launch fallback is included.
+
+The Linux AppImage bundles the .NET runtime, Avalonia graphics libraries, and
+libpcap. On first launch, it installs a protected payload under
+`/opt/lantern-control/0.1.0` and grants only `CAP_NET_RAW` and `CAP_NET_ADMIN`.
+The desktop interface continues to run as the normal user.
+
+### Network
+
+- The controller computer and target devices must be on the same IPv4 broadcast
+  network.
+- A stable connection is required. Ethernet is recommended. If Wi-Fi is used,
+  keep the controller near the router and prefer 5 GHz when possible.
 
 ## Installation
 
 Download the latest version from [GitHub Releases](https://github.com/humane125/LANtern-Control/releases/latest).
 
-### Installer
+### Windows installer
 
-1. Download `LANtern-Control-Setup-v0.1.2.msi`.
+1. Download `LANtern-Control-Setup-v0.1.3.msi`.
 2. Run the setup program.
 3. Choose the installation folder and whether to create Start Menu or desktop
    shortcuts.
 4. Launch LANtern Control and accept the Administrator prompt.
 
-### Portable version
+### Windows portable version
 
-1. Download `LANtern-Control-v0.1.2-win-x64.zip`.
+1. Download `LANtern-Control-v0.1.3-win-x64.zip`.
 2. Extract the complete archive to a folder where it can remain.
 3. Run `LANtern Control.exe` as Administrator from that folder. Keep the
    extracted files together; no application installation is required.
 
+### Linux AppImage beta
+
+1. Download `LANtern-Control-v0.1.0-x86_64.AppImage`.
+2. Make it executable through **Properties > Permissions > Allow executing file
+   as program**, or run:
+
+   ```bash
+   chmod +x LANtern-Control-v0.1.0-x86_64.AppImage
+   ```
+
+3. Double-click the AppImage, or start it from a terminal:
+
+   ```bash
+   ./LANtern-Control-v0.1.0-x86_64.AppImage
+   ```
+
+4. Approve the graphical administrator prompt on first launch. Later launches
+   of the same payload do not require another password.
+5. If FUSE is unavailable, use:
+
+   ```bash
+   APPIMAGE_EXTRACT_AND_RUN=1 ./LANtern-Control-v0.1.0-x86_64.AppImage
+   ```
+
+Always click **Stop & restore** before closing LANtern, changing networks,
+disconnecting the selected adapter, suspending, or rebooting.
+
 ## How to use
 
-1. Launch LANtern Control as Administrator.
+1. On Windows, launch LANtern Control as Administrator. On Linux, open the
+   configured AppImage normally after completing its one-time setup.
 2. Select the network adapter whose local IP address and gateway match the
    network you want to manage.
 3. Click **Start control** and wait for connected devices to appear.
@@ -109,7 +157,8 @@ Download the latest version from [GitHub Releases](https://github.com/humane125/
 Settings, saved device identities, and rules are stored locally in:
 
 ```text
-%LOCALAPPDATA%\LANternControl\settings.json
+Windows: %LOCALAPPDATA%\LANternControl\settings.json
+Linux:   ~/.local/share/LANternControl/settings.json
 ```
 
 No router username or password is required, and LANtern does not permanently
@@ -169,8 +218,8 @@ Wi-Fi or disable and re-enable its network adapter.
 
 ## Building from source
 
-The Windows application requires the .NET 8 SDK. The WiX 5 SDK used to produce
-the standard MSI is restored automatically by `dotnet`.
+Both applications require the .NET 8 SDK. The WiX 5 SDK used to produce the
+Windows MSI is restored automatically by `dotnet`.
 
 ```powershell
 dotnet test .\tests\Lantern.Core.Tests\Lantern.Core.Tests.csproj
@@ -180,6 +229,15 @@ dotnet test .\tests\Lantern.App.Tests\Lantern.App.Tests.csproj
 
 The publishing script creates the portable application and installer in the
 `outputs` folder.
+
+The Linux AppImage is built from the Avalonia project and the packaging scripts
+under `packaging/linux`. The reproducible compatibility image uses Ubuntu 20.04:
+
+```bash
+dotnet test ./tests/Lantern.Linux.Tests/Lantern.Linux.Tests.csproj -c Release
+dotnet publish ./src/Lantern.Linux/Lantern.Linux.csproj -c Release -r linux-x64 --self-contained true
+./packaging/linux/build-appimage.sh 0.1.0
+```
 
 ## License
 
@@ -194,8 +252,8 @@ traffic without permission may violate policies or local laws.
 ## Feedback and bug reports
 
 If you find a problem, [open a GitHub issue](https://github.com/humane125/LANtern-Control/issues)
-and include the LANtern version, Windows version, adapter type, Npcap version,
-router model, and steps needed to reproduce it.
+and include the LANtern version, operating system and distribution, adapter
+type, capture-library version, router model, and steps needed to reproduce it.
 
 ---
 

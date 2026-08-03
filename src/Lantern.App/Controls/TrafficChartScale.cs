@@ -16,70 +16,11 @@ public static class TrafficChartScale
             throw new ArgumentOutOfRangeException(nameof(maximumPoints));
         }
 
-        if (samples.Count <= maximumPoints)
-        {
-            return samples;
-        }
-
-        if (maximumPoints == 2)
-        {
-            return [samples[0], samples[^1]];
-        }
-
-        if (maximumPoints == 3)
-        {
-            var peak = samples
-                .Skip(1)
-                .Take(samples.Count - 2)
-                .MaxBy(GetCombinedRate)!;
-            return [samples[0], peak, samples[^1]];
-        }
-
-        var result = new List<TrafficSample>(maximumPoints) { samples[0] };
-        var interiorCount = samples.Count - 2;
-        var bucketCount = Math.Max(1, (maximumPoints - 2) / 2);
-        for (var bucket = 0; bucket < bucketCount; bucket++)
-        {
-            var start = 1 + (int)((long)bucket * interiorCount / bucketCount);
-            var end = 1 + (int)((long)(bucket + 1) * interiorCount / bucketCount);
-            if (start >= end)
-            {
-                continue;
-            }
-
-            var minimumIndex = start;
-            var maximumIndex = start;
-            for (var index = start + 1; index < end; index++)
-            {
-                if (GetCombinedRate(samples[index]) < GetCombinedRate(samples[minimumIndex]))
-                {
-                    minimumIndex = index;
-                }
-
-                if (GetCombinedRate(samples[index]) > GetCombinedRate(samples[maximumIndex]))
-                {
-                    maximumIndex = index;
-                }
-            }
-
-            if (minimumIndex == maximumIndex)
-            {
-                result.Add(samples[minimumIndex]);
-            }
-            else if (minimumIndex < maximumIndex)
-            {
-                result.Add(samples[minimumIndex]);
-                result.Add(samples[maximumIndex]);
-            }
-            else
-            {
-                result.Add(samples[maximumIndex]);
-                result.Add(samples[minimumIndex]);
-            }
-        }
-
-        result.Add(samples[^1]);
-        return result;
+        // The visible history is only ten minutes (240 2.5-second samples),
+        // so preserve every real sample. The former min/max bucket reduction
+        // distorted adjacent spikes and made hover points disagree with the
+        // actual timeline.
+        return samples;
     }
 
     public static double GetMaximum(IReadOnlyList<TrafficSample> samples)
@@ -160,6 +101,4 @@ public static class TrafficChartScale
         return new TrafficChartWindow(latest - duration, latest);
     }
 
-    private static double GetCombinedRate(TrafficSample sample) =>
-        sample.DownloadBytesPerSecond + sample.UploadBytesPerSecond;
 }

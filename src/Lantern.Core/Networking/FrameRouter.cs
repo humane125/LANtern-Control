@@ -28,6 +28,7 @@ public sealed class FrameRouter
     private readonly IPAddress localIp;
     private readonly PhysicalAddress gatewayMac;
     private readonly TrafficPolicy policy;
+    private readonly bool enforceRateLimits;
     private readonly ConcurrentDictionary<IPAddress, PhysicalAddress> clients;
     private readonly ConcurrentDictionary<ObservedFlowKey, string> observedFlowDomains = [];
 
@@ -36,12 +37,14 @@ public sealed class FrameRouter
         IPAddress localIp,
         PhysicalAddress gatewayMac,
         IReadOnlyDictionary<IPAddress, PhysicalAddress> clients,
-        TrafficPolicy policy)
+        TrafficPolicy policy,
+        bool enforceRateLimits = true)
     {
         this.localMac = localMac;
         this.localIp = localIp;
         this.gatewayMac = gatewayMac;
         this.policy = policy;
+        this.enforceRateLimits = enforceRateLimits;
         this.clients = new ConcurrentDictionary<IPAddress, PhysicalAddress>(clients);
     }
 
@@ -49,6 +52,16 @@ public sealed class FrameRouter
     {
         if (!address.Equals(localIp))
         {
+            foreach (var staleAddress in clients
+                         .Where(pair =>
+                             pair.Value.Equals(macAddress) &&
+                             !pair.Key.Equals(address))
+                         .Select(pair => pair.Key)
+                         .ToArray())
+            {
+                clients.TryRemove(staleAddress, out _);
+            }
+
             clients[address] = macAddress;
         }
     }
@@ -166,7 +179,10 @@ public sealed class FrameRouter
                 BlockedByDomain: true);
         }
 
-        if (!policy.ShouldForward(clientMac.ToString(), direction, frame.Length))
+        var shouldForward = enforceRateLimits
+            ? policy.ShouldForward(clientMac.ToString(), direction, frame.Length)
+            : !policy.GetRule(clientMac.ToString()).PauseInternet;
+        if (!shouldForward)
         {
             return new FrameRouteResult(
                 FrameAction.Drop,

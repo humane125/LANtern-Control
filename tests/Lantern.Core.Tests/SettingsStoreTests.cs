@@ -180,6 +180,55 @@ public sealed class SettingsStoreTests
         }
     }
 
+    [Fact]
+    public async Task ConcurrentStores_SerializeWritesToTheSameSettingsPath()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var first = new SettingsStore(directory);
+            var second = new SettingsStore(directory);
+            var writes = Enumerable.Range(0, 40)
+                .Select(index => (index & 1) == 0
+                    ? first.SaveAsync(new AppSettings { DisableUpdateChecks = true })
+                    : second.SaveAsync(new AppSettings { DisableUpdateChecks = false }));
+
+            await Task.WhenAll(writes);
+
+            var loaded = await first.LoadAsync();
+            Assert.NotNull(loaded);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ConcurrentLoadAndSave_DoNotRaceReplacingSettingsFile()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var settingsPath = Path.Combine(directory, "settings.json");
+            await File.WriteAllTextAsync(
+                settingsPath,
+                $"{{\"padding\":\"{new string('x', 16 * 1024 * 1024)}\"}}");
+            var store = new SettingsStore(directory);
+
+            var load = store.LoadAsync();
+            var save = store.SaveAsync(new AppSettings { DisableUpdateChecks = true });
+
+            await Task.WhenAll(load, save);
+            var loaded = await store.LoadAsync();
+            Assert.True(loaded.DisableUpdateChecks);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), $"LanternControlTests-{Guid.NewGuid():N}");

@@ -24,7 +24,7 @@ public sealed class LiveTrafficChart : FrameworkElement
             typeof(TimeSpan),
             typeof(LiveTrafficChart),
             new FrameworkPropertyMetadata(
-                TimeSpan.FromHours(1),
+                TimeSpan.FromMinutes(10),
                 FrameworkPropertyMetadataOptions.AffectsRender));
 
     private const double LeftPadding = 54;
@@ -38,6 +38,7 @@ public sealed class LiveTrafficChart : FrameworkElement
         Focusable = true;
         Cursor = Cursors.Cross;
         SnapsToDevicePixels = true;
+        ClipToBounds = true;
     }
 
     public IReadOnlyList<TrafficSample> Samples
@@ -209,7 +210,7 @@ public sealed class LiveTrafficChart : FrameworkElement
     private TimeSpan GetVisibleDuration() =>
         VisibleDuration > TimeSpan.Zero
             ? VisibleDuration
-            : TimeSpan.FromHours(1);
+            : TimeSpan.FromMinutes(10);
 
     private void UpdateToolTip(TrafficSample sample)
     {

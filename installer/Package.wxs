@@ -2,14 +2,15 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="LANtern Control"
            Manufacturer="LANtern Control"
-           Version="0.1.2"
+           Version="0.1.3"
            UpgradeCode="04C973A1-E90F-4E07-9C93-C3EF9C189A66"
            Scope="perMachine"
            InstallerVersion="500"
            Language="1033">
     <SummaryInformation Description="LANtern Control installer"
                         Manufacturer="LANtern Control" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of LANtern Control is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of LANtern Control is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Icon Id="AppIcon" SourceFile="..\src\Lantern.App\Assets\RedWatcher.ico" />

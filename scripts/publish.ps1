@@ -10,7 +10,7 @@ $installerProject = Join-Path $projectRoot "installer\LanternControl.wixproj"
 $installerVerification = Join-Path $projectRoot "scripts\verify-msi-installer.ps1"
 $projectFile = Join-Path $projectRoot "src\Lantern.App\Lantern.App.csproj"
 $solutionFile = Join-Path $projectRoot "LanternControl.slnx"
-$releaseVersion = "0.1.2"
+$releaseVersion = "0.1.3"
 
 dotnet test $solutionFile -c $Configuration
 if ($LASTEXITCODE -ne 0) {

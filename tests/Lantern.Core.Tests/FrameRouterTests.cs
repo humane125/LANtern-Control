@@ -91,6 +91,26 @@ public sealed class FrameRouterTests
     }
 
     [Fact]
+    public void Route_ExternalPacingDefersRateLimitButStillDropsPausedTraffic()
+    {
+        var policy = new TrafficPolicy();
+        policy.SetRule(ClientMac.ToString(), new TrafficRule(false, 1, 1));
+        var router = CreateRouter(policy, enforceRateLimits: false);
+        var frame = BuildIpv4Frame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            IPAddress.Parse("8.8.8.8"),
+            2_000);
+
+        Assert.Equal(FrameAction.Forward, router.Route(frame).Action);
+
+        policy.SetRule(ClientMac.ToString(), new TrafficRule(true, 0, 0));
+
+        Assert.Equal(FrameAction.Drop, router.Route(frame).Action);
+    }
+
+    [Fact]
     public void Route_BlockedDomainDropsOnlyTheMatchingClientsOutboundRequest()
     {
         var policy = new TrafficPolicy();
@@ -177,13 +197,39 @@ public sealed class FrameRouterTests
         Assert.Equal(FrameAction.Ignore, result.Action);
     }
 
-    private static FrameRouter CreateRouter(TrafficPolicy? policy = null) =>
+    [Fact]
+    public void UpdateClient_RemovesStaleAddressForTheSameMac()
+    {
+        var router = CreateRouter();
+        var latestAddress = IPAddress.Parse("192.168.31.213");
+        router.UpdateClient(latestAddress, ClientMac);
+        var oldAddressFrame = BuildIpv4Frame(
+            LocalMac,
+            GatewayMac,
+            IPAddress.Parse("1.1.1.1"),
+            ClientIp,
+            100);
+        var latestAddressFrame = BuildIpv4Frame(
+            LocalMac,
+            GatewayMac,
+            IPAddress.Parse("1.1.1.1"),
+            latestAddress,
+            100);
+
+        Assert.Equal(FrameAction.Ignore, router.Route(oldAddressFrame).Action);
+        Assert.Equal(FrameAction.Forward, router.Route(latestAddressFrame).Action);
+    }
+
+    private static FrameRouter CreateRouter(
+        TrafficPolicy? policy = null,
+        bool enforceRateLimits = true) =>
         new(
             LocalMac,
             LocalIp,
             GatewayMac,
             new Dictionary<IPAddress, PhysicalAddress> { [ClientIp] = ClientMac },
-            policy ?? new TrafficPolicy());
+            policy ?? new TrafficPolicy(),
+            enforceRateLimits);
 
     private static byte[] BuildIpv4Frame(
         PhysicalAddress destinationMac,

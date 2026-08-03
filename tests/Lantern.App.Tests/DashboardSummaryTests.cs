@@ -77,6 +77,33 @@ public sealed class DashboardSummaryTests
         Assert.Empty(summary.DeviceTraffic);
     }
 
+    [Fact]
+    public void ToTrafficSample_PreservesPerDeviceTrafficForChartPresentation()
+    {
+        var phone = CreateDevice(
+            "0E4F69CCE4F0",
+            "192.168.31.213",
+            "POCO-F6",
+            2_000,
+            400,
+            isProtected: false,
+            null);
+        var summary = DashboardSummary.From([phone]);
+        var timestamp = DateTimeOffset.Parse("2026-08-03T12:00:00Z");
+
+        var sample = summary.ToTrafficSample(timestamp);
+
+        Assert.Equal(timestamp, sample.Timestamp);
+        var traffic = Assert.Single(sample.DeviceTraffic!);
+        Assert.Equal("POCO-F6", traffic.DeviceName);
+        Assert.Equal(2_000, traffic.DownloadBytesPerSecond);
+        Assert.Equal(400, traffic.UploadBytesPerSecond);
+        Assert.DoesNotContain(
+            "No active device traffic",
+            Lantern.App.Controls.TrafficChartPresentation.BuildLatestSummary(sample),
+            StringComparison.Ordinal);
+    }
+
     private static DeviceViewModel CreateDevice(
         string mac,
         string ip,

@@ -24,6 +24,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private readonly PassiveDiscoveryProfile discoveryProfile =
         PassiveDiscoveryProfile.Default;
     private readonly ClientMappingCache clientMappings = new();
+    private readonly ResolvedDeviceNameClaims resolvedNameClaims = new(Dns.GetHostName());
     private readonly ConcurrentDictionary<string, byte> resolvingNames =
         new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? engineCancellation;
@@ -37,6 +38,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private ConcurrentDictionary<IPAddress, PhysicalAddress>? activeProbeReplies;
     private ConcurrentDictionary<string, IPAddress>? activeKnownDeviceReplies;
     private KnownDeviceHint[] knownDeviceHints = [];
+    private string[] rejectedResolvedNames = [];
+    private string? backgroundFailure;
     private volatile bool controlling;
     private volatile bool restoring;
     private long forwardedPacketCount;
@@ -60,6 +63,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
     public event EventHandler<string>? StatusChanged;
 
+    public event EventHandler<PcapEngineStateChangedEventArgs>? StateChanged;
+
     public event EventHandler<DeviceIdentityLearnedEventArgs>? DeviceIdentityLearned;
 
     public event EventHandler<DeviceDomainObservedEventArgs>? DeviceDomainObserved;
@@ -73,6 +78,13 @@ public sealed class PcapLanEngine : IAsyncDisposable
             .ToArray();
     }
 
+    public void ReplaceRejectedResolvedNames(IEnumerable<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        rejectedResolvedNames = names.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        resolvedNameClaims.Reset(rejectedResolvedNames);
+    }
+
     public async Task StartAsync(AdapterProfile adapter, CancellationToken cancellationToken)
     {
         if (IsRunning)
@@ -83,8 +95,12 @@ public sealed class PcapLanEngine : IAsyncDisposable
         await NpfDriverService.EnsureAvailableAsync(cancellationToken);
         profile = adapter;
         clientMappings.BeginAdapter(adapter.Id);
+        resolvedNameClaims.Reset(rejectedResolvedNames);
+        resolvingNames.Clear();
+        registry.BeginSession();
         var clients = clientMappings.Mappings;
         restoring = false;
+        backgroundFailure = null;
         Interlocked.Exchange(ref forwardedPacketCount, 0);
         Interlocked.Exchange(ref droppedPacketCount, 0);
         gatewayResolution = new TaskCompletionSource<PhysicalAddress>(
@@ -151,11 +167,17 @@ public sealed class PcapLanEngine : IAsyncDisposable
             backgroundTask = Task.WhenAll(
                 forwardingTask,
                 RunMaintenanceAsync(engineCancellation.Token));
-            RaiseStatus(
-                "Live monitoring active — 0 KB/s is unlimited and remains visible.");
+            const string activeMessage =
+                "Live monitoring active — 0 KB/s is unlimited and remains visible.";
+            RaiseStatus(activeMessage);
+            RaiseStateChanged(true, activeMessage);
         }
-        catch
+        catch (Exception exception)
         {
+            Interlocked.CompareExchange(
+                ref backgroundFailure,
+                $"Startup failed: {exception.Message}",
+                null);
             await StopAsync();
             throw;
         }
@@ -259,10 +281,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 continue;
             }
 
-            var needsPoison =
-                !clients.TryGetValue(neighbor.Address, out var previousMac) ||
-                !previousMac.Equals(neighbor.MacAddress);
-            clients[neighbor.Address] = neighbor.MacAddress;
+            var needsPoison = clientMappings.Upsert(neighbor.Address, neighbor.MacAddress);
             frameRouter?.UpdateClient(neighbor.Address, neighbor.MacAddress);
             registry.Remember(
                 neighbor.Address,
@@ -415,7 +434,13 @@ public sealed class PcapLanEngine : IAsyncDisposable
             gatewayMac = null;
             profile = null;
             restoring = false;
-            RaiseStatus("Stopped. Corrective ARP mappings were sent.");
+            var failure = backgroundFailure;
+            backgroundFailure = null;
+            var stoppedMessage = failure is null
+                ? "Stopped. Corrective ARP mappings were sent."
+                : $"Stopped after an engine error: {failure}. Corrective ARP mappings were sent.";
+            RaiseStatus(stoppedMessage);
+            RaiseStateChanged(false, stoppedMessage, failure);
         }
         finally
         {
@@ -496,10 +521,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             forwarderStarted.TrySetException(exception);
-            RaiseStatus(
-                $"Forwarding failed; restoring normal ARP mappings: {exception.Message}");
-            engineCancellation?.Cancel();
-            _ = Task.Run(StopAsync);
+            HandleBackgroundFailure("Forwarding failed", exception);
         }
     }
 
@@ -573,10 +595,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
             return;
         }
 
-        var needsPoison =
-            !clients.TryGetValue(arp.SenderIp, out var previousMac) ||
-            !previousMac.Equals(arp.SenderMac);
-        clients[arp.SenderIp] = arp.SenderMac;
+        var needsPoison = clientMappings.Upsert(arp.SenderIp, arp.SenderMac);
         activeProbeReplies?.TryAdd(arp.SenderIp, arp.SenderMac);
         activeKnownDeviceReplies?.TryAdd(
             TrafficPolicy.NormalizeMac(arp.SenderMac.ToString()),
@@ -606,18 +625,26 @@ public sealed class PcapLanEngine : IAsyncDisposable
             return;
         }
 
-        var dnsTask = ResolveDnsNameAsync(address);
         var netBiosTask = NetBiosNameResolver.ResolveAsync(address);
         var mdnsTask = MdnsNameResolver.ResolveAsync(address);
-        var pending = new List<Task<string?>> { dnsTask, netBiosTask, mdnsTask };
-        while (pending.Count > 0)
+        var dnsTask = ResolveDnsNameAsync(address);
+        await Task.WhenAll(netBiosTask, mdnsTask, dnsTask);
+        foreach (var name in new[] { netBiosTask.Result, mdnsTask.Result, dnsTask.Result })
         {
-            var completed = await Task.WhenAny(pending);
-            pending.Remove(completed);
-            var name = await completed;
-            if (!string.IsNullOrWhiteSpace(name))
+            if (resolvedNameClaims.TryClaim(
+                    mac,
+                    name,
+                    out var acceptedName,
+                    out var isNewClaim))
             {
-                registry.SetHostName(mac, name);
+                registry.SetHostName(mac, acceptedName);
+                if (isNewClaim)
+                {
+                    DeviceIdentityLearned?.Invoke(
+                        this,
+                        new DeviceIdentityLearnedEventArgs(mac, acceptedName));
+                }
+
                 return;
             }
         }
@@ -963,5 +990,25 @@ public sealed class PcapLanEngine : IAsyncDisposable
         return bytes.All(value => value == 0) || bytes.All(value => value == 0xff);
     }
 
+    private void HandleBackgroundFailure(string source, Exception exception)
+    {
+        var failure = $"{source}: {exception.Message}";
+        Interlocked.CompareExchange(ref backgroundFailure, failure, null);
+        RaiseStatus($"{failure}; restoring the network.");
+        engineCancellation?.Cancel();
+        _ = Task.Run(StopAsync);
+    }
+
     private void RaiseStatus(string message) => StatusChanged?.Invoke(this, message);
+
+    private void RaiseStateChanged(
+        bool isRunning,
+        string statusMessage,
+        string? failureMessage = null) =>
+        StateChanged?.Invoke(
+            this,
+            new PcapEngineStateChangedEventArgs(
+                isRunning,
+                statusMessage,
+                failureMessage));
 }

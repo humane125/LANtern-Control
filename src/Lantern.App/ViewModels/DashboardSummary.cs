@@ -10,6 +10,16 @@ public sealed record DashboardSummary(
     double TopDeviceUploadBytesPerSecond,
     IReadOnlyList<DeviceTrafficSnapshot> DeviceTraffic)
 {
+    public TrafficSample ToTrafficSample(DateTimeOffset timestamp) =>
+        new(
+            timestamp,
+            DownloadBytesPerSecond,
+            UploadBytesPerSecond,
+            TopDeviceName,
+            TopDeviceDownloadBytesPerSecond,
+            TopDeviceUploadBytesPerSecond,
+            DeviceTraffic);
+
     public static DashboardSummary From(IEnumerable<DeviceViewModel> devices)
     {
         var clients = devices.Where(device => device.CanControl).ToArray();

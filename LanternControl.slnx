@@ -2,10 +2,12 @@
   <Folder Name="/src/">
     <Project Path="src/Lantern.App/Lantern.App.csproj" />
     <Project Path="src/Lantern.Core/Lantern.Core.csproj" />
+    <Project Path="src/Lantern.Linux/Lantern.Linux.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Lantern.App.Tests/Lantern.App.Tests.csproj" />
     <Project Path="tests/Lantern.Core.Tests/Lantern.Core.Tests.csproj" />
+    <Project Path="tests/Lantern.Linux.Tests/Lantern.Linux.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/Lantern.LiveProbe/Lantern.LiveProbe.csproj" />

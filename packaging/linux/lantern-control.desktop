@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LANtern Control
+Comment=Monitor and manage devices on a local IPv4 network
+Exec=LANtern-Control
+Icon=lantern-control
+Terminal=false
+Categories=Network;
+Keywords=network;bandwidth;monitor;limiter;lan;
+StartupNotify=true
+X-AppImage-Version=0.1.0

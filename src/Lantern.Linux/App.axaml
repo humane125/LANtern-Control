@@ -1,0 +1,29 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Lantern.Linux.App"
+             RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <SolidColorBrush x:Key="WindowBackgroundBrush">#08090B</SolidColorBrush>
+    <SolidColorBrush x:Key="SidebarBackgroundBrush">#060708</SolidColorBrush>
+    <SolidColorBrush x:Key="SurfaceBrush">#101114</SolidColorBrush>
+    <SolidColorBrush x:Key="SurfaceRaisedBrush">#171317</SolidColorBrush>
+    <SolidColorBrush x:Key="SurfaceHoverBrush">#21171B</SolidColorBrush>
+    <SolidColorBrush x:Key="InputBackgroundBrush">#0C0B0D</SolidColorBrush>
+    <SolidColorBrush x:Key="BorderBrush">#2B2226</SolidColorBrush>
+    <SolidColorBrush x:Key="PrimaryTextBrush">#F4EEF0</SolidColorBrush>
+    <SolidColorBrush x:Key="SecondaryTextBrush">#A89095</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentBrush">#D72C43</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentDarkBrush">#261014</SolidColorBrush>
+    <SolidColorBrush x:Key="DownloadAccentBrush">#D72C43</SolidColorBrush>
+    <SolidColorBrush x:Key="UploadAccentBrush">#9B6670</SolidColorBrush>
+    <SolidColorBrush x:Key="SuccessBrush">#68C08A</SolidColorBrush>
+    <SolidColorBrush x:Key="DangerBrush">#F06473</SolidColorBrush>
+    <SolidColorBrush x:Key="DangerDarkBrush">#2C1117</SolidColorBrush>
+    <SolidColorBrush x:Key="ScrollTrackBrush">#09090B</SolidColorBrush>
+    <SolidColorBrush x:Key="ScrollThumbBrush">#70404A</SolidColorBrush>
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush">#A84A5A</SolidColorBrush>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+</Application>

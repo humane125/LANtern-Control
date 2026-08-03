@@ -1,0 +1,825 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Lantern.Linux.Controls"
+        xmlns:converters="using:Lantern.Linux.Converters"
+        x:Class="Lantern.Linux.MainWindow"
+        Width="1440" Height="900" MinWidth="1100" MinHeight="700"
+        Background="#08090B" Foreground="#F4EEF0"
+        FontFamily="Inter"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        Icon="avares://LANtern%20Control/Assets/lantern-control.png"
+        Title="LANtern Control">
+  <Window.Resources>
+    <converters:NonNegativeIntegerConverter x:Key="NonNegativeIntegerConverter" />
+  </Window.Resources>
+  <Window.Styles>
+    <Style Selector="TextBlock.eyebrow">
+      <Setter Property="Foreground" Value="#D72C43" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.nav">
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="Margin" Value="12,3" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="#A89095" />
+      <Setter Property="MinHeight" Value="46" />
+      <Setter Property="CornerRadius" Value="9" />
+    </Style>
+    <Style Selector="Button.nav:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#171317" />
+    </Style>
+    <Style Selector="Button.nav.active">
+      <Setter Property="Background" Value="#261014" />
+      <Setter Property="BorderBrush" Value="#D72C43" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#F4EEF0" />
+    </Style>
+    <Style Selector="Button.action">
+      <Setter Property="Padding" Value="18,10" />
+      <Setter Property="Background" Value="#171317" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Foreground" Value="#F4EEF0" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="MinWidth" Value="108" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#261014" />
+      <Setter Property="BorderBrush" Value="#D72C43" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="#2C1117" />
+      <Setter Property="BorderBrush" Value="#F06473" />
+    </Style>
+    <Style Selector="Button:disabled">
+      <Setter Property="Opacity" Value="0.42" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#0C0B0D" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="Foreground" Value="#F4EEF0" />
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="TextBox:disabled">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="#A89095" />
+      <Setter Property="Opacity" Value="0.48" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="#0C0B0D" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#F4EEF0" />
+      <Setter Property="Padding" Value="10,7" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="MaxDropDownHeight" Value="280" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid ColumnDefinitions="*,32">
+            <Border x:Name="ComboBorder"
+                    Grid.ColumnSpan="2"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}" />
+            <ContentControl x:Name="ContentPresenter"
+                            Grid.Column="0"
+                            Margin="{TemplateBinding Padding}"
+                            Content="{TemplateBinding SelectionBoxItem}"
+                            ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+            <PathIcon Grid.Column="1"
+                      Width="10" Height="6"
+                      Margin="0,0,11,0"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Center"
+                      Foreground="#A89095"
+                      Data="M0,0 L5,5 L10,0 Z" />
+            <Popup x:Name="PART_Popup"
+                   Grid.ColumnSpan="2"
+                   IsOpen="{TemplateBinding IsDropDownOpen, Mode=TwoWay}"
+                   MinWidth="{Binding Bounds.Width, RelativeSource={RelativeSource TemplatedParent}}"
+                   MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                   PlacementTarget="ComboBorder"
+                   IsLightDismissEnabled="True"
+                   InheritsTransform="True">
+              <Border x:Name="PopupBorder"
+                      Margin="0,4,0,0"
+                      Padding="3"
+                      HorizontalAlignment="Stretch"
+                      Background="#261014"
+                      BorderBrush="#522029"
+                      BorderThickness="1"
+                      CornerRadius="7">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto"
+                              IsScrollChainingEnabled="False">
+                  <ItemsPresenter x:Name="PART_ItemsPresenter"
+                                  ItemsPanel="{TemplateBinding ItemsPanel}" />
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.16" />
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.16" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="ComboBox:pointerover">
+      <Setter Property="BorderBrush" Value="#70404A" />
+      <Setter Property="Background" Value="#110E11" />
+    </Style>
+    <Style Selector="ComboBox[IsDropDownOpen=true]">
+      <Setter Property="BorderBrush" Value="#D72C43" />
+      <Setter Property="Background" Value="#160B0E" />
+    </Style>
+    <Style Selector="ComboBox /template/ Border#PopupBorder">
+      <Setter Property="Background" Value="#261014" />
+      <Setter Property="BorderBrush" Value="#522029" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="Padding" Value="3" />
+    </Style>
+    <Style Selector="ComboBox[IsDropDownOpen=true] /template/ Border#PopupBorder">
+      <Style.Animations>
+        <Animation Duration="0:0:0.18" FillMode="Forward">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="0" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="1" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="ComboBoxItem">
+      <Setter Property="Foreground" Value="#F4EEF0" />
+      <Setter Property="Background" Value="#261014" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Padding" Value="10,7" />
+    </Style>
+    <Style Selector="ComboBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#261014" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.14" />
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.14" />
+          <BrushTransition Property="Foreground" Duration="0:0:0.14" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#160B0E" />
+      <Setter Property="BorderBrush" Value="#522029" />
+      <Setter Property="Foreground" Value="#F4EEF0" />
+    </Style>
+    <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#261014" />
+      <Setter Property="BorderBrush" Value="#7C1425" />
+      <Setter Property="Foreground" Value="#F4EEF0" />
+    </Style>
+    <Style Selector="ComboBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#522029" />
+      <Setter Property="BorderBrush" Value="#A31F34" />
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#101114" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+    </Style>
+    <Style Selector="Border.metric-card">
+      <Setter Property="Background" Value="#101114" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="18" />
+      <Setter Property="MinHeight" Value="106" />
+    </Style>
+    <Style Selector="Border.icon-surface">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="#160B0E" />
+    </Style>
+    <Style Selector="Border.limit-editor">
+      <Setter Property="Background" Value="#0C0B0D" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="MinHeight" Value="42" />
+    </Style>
+    <Style Selector="Border.limit-editor:disabled">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="#2B2226" />
+      <Setter Property="Opacity" Value="0.42" />
+    </Style>
+    <Style Selector="ItemsControl.activity-groups > ContentPresenter">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="ItemsControl.preset-rules > ContentPresenter">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="ScrollViewer.domain-scroll">
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+      <Setter Property="AllowAutoHide" Value="False" />
+    </Style>
+    <Style Selector="TextBox.device-name">
+      <Setter Property="Height" Value="18" />
+      <Setter Property="MinHeight" Value="18" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Arrow" />
+    </Style>
+    <Style Selector="TextBox.device-name:focus">
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Expander.lantern-expander">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid RowDefinitions="Auto,Auto">
+            <ToggleButton Classes="expander-toggle"
+                          Grid.Row="0"
+                          Padding="0"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch"
+                          VerticalContentAlignment="Stretch"
+                          Content="{TemplateBinding Header}"
+                          ContentTemplate="{TemplateBinding HeaderTemplate}"
+                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+              <ToggleButton.Template>
+                <ControlTemplate>
+                  <Border x:Name="ToggleSurface"
+                          Padding="12,0"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          CornerRadius="9">
+                    <Grid ColumnDefinitions="32,*">
+                      <Border x:Name="ChevronSurface"
+                              Width="24" Height="24"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center"
+                              Background="#160B0E"
+                              BorderBrush="#522029"
+                              BorderThickness="1"
+                              CornerRadius="7">
+                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                          <Path x:Name="ExpanderChevronDown"
+                                Width="10" Height="8"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Data="M1,2 L5,6 L9,2"
+                                Stroke="#D72C43"
+                                StrokeThickness="1.8"
+                                StrokeLineCap="Round"
+                                StrokeJoin="Round"
+                                Stretch="Uniform" />
+                          <Path x:Name="ExpanderChevronUp"
+                                Width="10" Height="8"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Data="M1,6 L5,2 L9,6"
+                                Stroke="#D72C43"
+                                StrokeThickness="1.8"
+                                StrokeLineCap="Round"
+                                StrokeJoin="Round"
+                                Stretch="Uniform"
+                                IsVisible="False" />
+                        </Grid>
+                      </Border>
+                      <ContentPresenter Grid.Column="1"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Center"
+                                        Content="{TemplateBinding Content}"
+                                        ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    </Grid>
+                  </Border>
+                </ControlTemplate>
+              </ToggleButton.Template>
+            </ToggleButton>
+            <ContentPresenter Grid.Row="1"
+                              HorizontalAlignment="Stretch"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              IsVisible="{TemplateBinding IsExpanded}" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.expander-toggle">
+      <Setter Property="RenderTransform">
+        <ScaleTransform ScaleX="1" ScaleY="1" />
+      </Setter>
+      <Setter Property="Transitions">
+        <Transitions />
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.expander-toggle:pressed">
+      <Setter Property="RenderTransform">
+        <ScaleTransform ScaleX="1" ScaleY="1" />
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.expander-toggle:pointerover /template/ Border#ToggleSurface">
+      <Setter Property="Background" Value="#21171B" />
+    </Style>
+    <Style Selector="ToggleButton.expander-toggle:checked /template/ Border#ChevronSurface">
+      <Setter Property="BorderBrush" Value="#D72C43" />
+    </Style>
+    <Style Selector="ToggleButton.expander-toggle:checked /template/ Path#ExpanderChevronDown">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ToggleButton.expander-toggle:checked /template/ Path#ExpanderChevronUp">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Border.limit-editor:pointerover">
+      <Setter Property="BorderBrush" Value="#70404A" />
+    </Style>
+    <Style Selector="Button.titlebar">
+      <Setter Property="Width" Value="46" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="#A89095" />
+    </Style>
+    <Style Selector="Button.titlebar:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#21171B" />
+    </Style>
+    <Style Selector="Button.titlebar.close:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#D72C43" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="ScrollBar:vertical">
+      <Setter Property="Width" Value="9" />
+      <Setter Property="MinWidth" Value="9" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Track x:Name="PART_Track"
+                 Minimum="{TemplateBinding Minimum}"
+                 Maximum="{TemplateBinding Maximum}"
+                 Value="{TemplateBinding Value, Mode=TwoWay}"
+                 ViewportSize="{TemplateBinding ViewportSize}"
+                 DeferThumbDrag="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
+                 Orientation="Vertical"
+                 IsDirectionReversed="True">
+            <Track.DecreaseButton>
+              <RepeatButton Background="Transparent" BorderThickness="0" Opacity="0" Focusable="False" />
+            </Track.DecreaseButton>
+            <Track.IncreaseButton>
+              <RepeatButton Background="Transparent" BorderThickness="0" Opacity="0" Focusable="False" />
+            </Track.IncreaseButton>
+            <Thumb Classes="lantern-scroll-thumb"
+                   Width="7"
+                   MinHeight="42"
+                   Margin="1,2"
+                   Background="#A84A5A"
+                   BorderThickness="0"
+                   CornerRadius="4">
+              <Thumb.Template>
+                <ControlTemplate>
+                  <Border Background="{TemplateBinding Background}"
+                          CornerRadius="{TemplateBinding CornerRadius}" />
+                </ControlTemplate>
+              </Thumb.Template>
+            </Thumb>
+          </Track>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ScrollBar:vertical /template/ Thumb.lantern-scroll-thumb">
+      <Setter Property="Background" Value="#A84A5A" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.14" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="ScrollBar:vertical:pointerover /template/ Thumb.lantern-scroll-thumb">
+      <Setter Property="Background" Value="#9B6670" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="38,*">
+    <Border Grid.Row="0" Background="#09090B" PointerPressed="TitleBar_OnPointerPressed">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Margin="13,0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+          <controls:RedWatcherLogo Width="22" Height="20" />
+          <TextBlock Text="LANtern Control" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal">
+          <Button x:Name="MinimizeWindowButton" Classes="titlebar" Click="MinimizeButton_OnClick">
+            <Path Width="16" Height="16" Data="M 2,12 L 14,12" Stroke="#A89095" StrokeThickness="1.5" IsHitTestVisible="False" />
+          </Button>
+          <Button x:Name="MaximizeWindowButton" Classes="titlebar" Click="MaximizeButton_OnClick">
+            <Path Width="16" Height="16" Data="M 2,2 L 14,2 L 14,14 L 2,14 Z" Stroke="#A89095" StrokeThickness="1.5" IsHitTestVisible="False" />
+          </Button>
+          <Button x:Name="CloseWindowButton" Classes="titlebar close" Click="CloseButton_OnClick">
+            <Path Width="16" Height="16" Data="M 2,2 L 14,14 M 14,2 L 2,14" Stroke="#A89095" StrokeThickness="1.5" IsHitTestVisible="False" />
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="228,*">
+      <Border Grid.Column="0" Background="#09090B" BorderBrush="#2B2226" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+          <StackPanel Margin="20,24,18,34" Orientation="Horizontal" Spacing="12">
+            <Border Width="54" Height="54" CornerRadius="14"
+                    Background="#160B0E" BorderBrush="#D72C43" BorderThickness="1">
+              <controls:RedWatcherLogo x:Name="BrandLogo" Width="50" Height="50" />
+            </Border>
+            <StackPanel Margin="0,7,0,0">
+              <TextBlock Text="LANtern" FontSize="20" FontWeight="Bold" />
+              <TextBlock Text="CONTROL" Classes="eyebrow" LetterSpacing="1.4" />
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock Grid.Row="1" Margin="26,0,0,7" Text="WORKSPACE" Foreground="#A89095" FontSize="9" />
+          <StackPanel Grid.Row="2">
+            <Button x:Name="OverviewNavButton" Classes="nav active" Click="OverviewNavButton_OnClick">
+              <StackPanel Orientation="Horizontal" Spacing="11">
+                <Path x:Name="OverviewNavIcon" Width="16" Height="16" Data="M2,2 H8 V8 H2 Z M12,2 H18 V8 H12 Z M2,12 H8 V18 H2 Z M12,12 H18 V18 H12 Z"
+                      Fill="#D72C43" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="Overview" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="ActivityNavButton" Classes="nav" Click="ActivityNavButton_OnClick">
+              <StackPanel Orientation="Horizontal" Spacing="11">
+                <Path x:Name="ActivityNavIcon" Width="17" Height="17" Data="M1,15 L5,11 L9,13 L14,5 L19,8"
+                      Stroke="#A89095" StrokeThickness="1.8" StrokeLineCap="Round" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="Visited domains" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="RulesNavButton" Classes="nav" Click="RulesNavButton_OnClick">
+              <StackPanel Orientation="Horizontal" Spacing="11">
+                <Path x:Name="RulesNavIcon" Width="17" Height="18" Data="M10,1 L18,4 V9 C18,14 14.7,18 10,20 C5.3,18 2,14 2,9 V4 Z M7,10 L9,12 L14,7"
+                      Stroke="#A89095" StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="Domain rules" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+          <TextBlock x:Name="SidebarVersionText"
+                     Grid.Row="3"
+                     Margin="26,0,0,26"
+                     Text="{Binding VersionText}"
+                     Foreground="#A89095"
+                     FontSize="10"
+                     Opacity="0.72" />
+
+        </Grid>
+      </Border>
+
+      <Grid Grid.Column="1" Margin="30,0,0,20">
+        <Grid x:Name="OverviewPage" RowDefinitions="*,Auto">
+          <ScrollViewer x:Name="OverviewContentScroll" Grid.Row="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+            <StackPanel Margin="0,26,30,0" Spacing="18">
+          <Grid Margin="0,0,0,4" ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Text="NETWORK CONTROL" Classes="eyebrow" />
+              <TextBlock Text="Network overview" FontSize="27" FontWeight="Bold" Margin="0,4,0,0" />
+              <TextBlock Text="Monitor and control devices on your local network" Foreground="#A89095" Margin="0,4,0,0" />
+            </StackPanel>
+            <Border Grid.Column="1" Padding="14,8" CornerRadius="18" Background="#171317" BorderBrush="#2B2226" BorderThickness="1" VerticalAlignment="Top">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Ellipse x:Name="ActiveIndicator" Width="8" Height="8" Fill="#A89095" />
+                <TextBlock x:Name="ActiveStatusText" Text="Idle" FontWeight="SemiBold" />
+              </StackPanel>
+            </Border>
+          </Grid>
+
+              <Border Classes="card" Padding="22">
+              <Grid ColumnDefinitions="2.2*,0.8*,0.8*,Auto">
+                  <StackPanel Margin="0,0,22,0">
+                    <TextBlock Text="NETWORK ADAPTER" Classes="eyebrow" Foreground="#A89095" />
+                    <ComboBox x:Name="AdapterSelector" Margin="0,8,0,0" MinHeight="48" MinWidth="360" SelectionChanged="AdapterSelector_OnSelectionChanged">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                          <StackPanel>
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Summary}" FontSize="10" Foreground="#A89095" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Margin="28,0,24,0" VerticalAlignment="Center">
+                    <TextBlock Text="LOCAL IP" Classes="eyebrow" Foreground="#A89095" />
+                    <TextBlock x:Name="LocalIpText" Text="-" Margin="0,6,0,0" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Margin="28,0,24,0" VerticalAlignment="Center">
+                    <TextBlock Text="GATEWAY" Classes="eyebrow" Foreground="#A89095" />
+                    <TextBlock x:Name="GatewayText" Text="-" Margin="0,6,0,0" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button x:Name="StartButton" Classes="action primary" Content="Start control" Click="StartButton_OnClick" />
+                    <Button x:Name="RefreshButton" Classes="action" Content="Refresh devices" IsVisible="False" Click="RefreshButton_OnClick" />
+                    <Button x:Name="StopButton" Classes="action danger" Content="Stop &amp; restore" IsVisible="False" Click="StopButton_OnClick" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+
+              <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                <Border Classes="metric-card"><Grid ColumnDefinitions="*,Auto"><StackPanel><TextBlock Text="CONNECTED DEVICES" Classes="eyebrow" Foreground="#A89095"/><TextBlock x:Name="DeviceCountText" Text="0" FontSize="25" FontWeight="Bold" Margin="0,8,0,2"/><TextBlock Text="active clients" Foreground="#A89095" FontSize="10"/></StackPanel><Border Grid.Column="1" Classes="icon-surface"><Path Width="19" Height="19" Data="M2,3 H18 V14 H2 Z M7,18 H13 M10,14 V18" Stroke="#D72C43" StrokeThickness="1.7" Stretch="Uniform"/></Border></Grid></Border>
+                <Border Grid.Column="1" Classes="metric-card"><Grid ColumnDefinitions="*,Auto"><StackPanel><TextBlock Text="DOWNLOAD" Classes="eyebrow" Foreground="#A89095"/><TextBlock x:Name="DownloadTotalText" Text="0 B/s" FontSize="25" FontWeight="Bold" Margin="0,8,0,2"/><TextBlock Text="current total" Foreground="#A89095" FontSize="10"/></StackPanel><Path Grid.Column="1" Width="22" Height="22" Data="M10,2 V14 M5,10 L10,15 L15,10 M3,18 H17" Stroke="#D72C43" StrokeThickness="1.8" Stretch="Uniform"/></Grid></Border>
+                <Border Grid.Column="2" Classes="metric-card"><Grid ColumnDefinitions="*,Auto"><StackPanel><TextBlock Text="UPLOAD" Classes="eyebrow" Foreground="#A89095"/><TextBlock x:Name="UploadTotalText" Text="0 B/s" FontSize="25" FontWeight="Bold" Margin="0,8,0,2"/><TextBlock Text="current total" Foreground="#A89095" FontSize="10"/></StackPanel><Path Grid.Column="1" Width="22" Height="22" Data="M10,18 V6 M5,10 L10,5 L15,10 M3,2 H17" Stroke="#9B6670" StrokeThickness="1.8" Stretch="Uniform"/></Grid></Border>
+                <Border Grid.Column="3" Classes="metric-card"><Grid ColumnDefinitions="*,Auto"><StackPanel><TextBlock Text="ACTIVE LIMITS" Classes="eyebrow" Foreground="#A89095"/><TextBlock x:Name="ActiveRulesText" Text="0" FontSize="25" FontWeight="Bold" Margin="0,8,0,2"/><TextBlock Text="device rules" Foreground="#A89095" FontSize="10"/></StackPanel><Border Grid.Column="1" Classes="icon-surface"><Path Width="19" Height="19" Data="M3,5 H17 M3,10 H17 M3,15 H17" Stroke="#9B6670" StrokeThickness="1.8" Stretch="Uniform"/></Border></Grid></Border>
+              </Grid>
+
+              <Border Classes="card">
+                <Grid RowDefinitions="Auto,260,Auto">
+                  <Grid Margin="20,17" ColumnDefinitions="*,Auto">
+                    <StackPanel><TextBlock Text="LIVE THROUGHPUT" Classes="eyebrow" Foreground="#A89095"/><TextBlock Text="Network activity" FontSize="18" FontWeight="Bold" Margin="0,4,0,0"/></StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <Ellipse Width="7" Height="7" Fill="#D72C43"/><TextBlock Text="Download" Foreground="#A89095" FontSize="11" Margin="0,0,10,0"/>
+                      <Ellipse Width="7" Height="7" Fill="#9B6670"/><TextBlock Text="Upload" Foreground="#A89095" FontSize="11"/>
+                    </StackPanel>
+                  </Grid>
+                  <Border Grid.Row="1" BorderBrush="#2B2226" BorderThickness="0,1">
+                    <controls:TrafficChart x:Name="TrafficChart" />
+                  </Border>
+                  <Border Grid.Row="2" Padding="20,12" Background="#0C0B0D" BorderBrush="#2B2226" BorderThickness="0,1,0,0">
+                    <TextBlock x:Name="TopDeviceText" HorizontalAlignment="Right" Text="Waiting for device traffic" FontSize="11" FontWeight="SemiBold" />
+                  </Border>
+                </Grid>
+              </Border>
+
+              <Border Classes="card">
+                <Grid RowDefinitions="Auto,Auto,Auto">
+                  <Grid Margin="20,17" ColumnDefinitions="*,Auto">
+                    <StackPanel><TextBlock Text="NETWORK CLIENTS" Classes="eyebrow" Foreground="#A89095"/><TextBlock Text="Connected devices" FontSize="18" FontWeight="Bold" Margin="0,4,0,0"/></StackPanel>
+                    <TextBlock x:Name="DeviceCountLabel" Grid.Column="1" VerticalAlignment="Center" Foreground="#A89095" />
+                  </Grid>
+                  <Grid Grid.Row="1" Height="42" Background="#0C0B0D" ColumnDefinitions="2.2*,1.25*,1*,1*,1.25*,1.25*,1.05*">
+                    <TextBlock Margin="20,0,0,0" Text="DEVICE" VerticalAlignment="Center" Classes="eyebrow" Foreground="#A89095"/><TextBlock Grid.Column="1" Text="IP ADDRESS" VerticalAlignment="Center" Classes="eyebrow" Foreground="#A89095"/><TextBlock Grid.Column="2" Text="DOWNLOAD" VerticalAlignment="Center" Classes="eyebrow" Foreground="#A89095"/><TextBlock Grid.Column="3" Text="UPLOAD" VerticalAlignment="Center" Classes="eyebrow" Foreground="#A89095"/><TextBlock Grid.Column="4" Text="DOWN LIMIT" VerticalAlignment="Center" Classes="eyebrow" Foreground="#A89095"/><TextBlock Grid.Column="5" Text="UP LIMIT" VerticalAlignment="Center" Classes="eyebrow" Foreground="#A89095"/><TextBlock Grid.Column="6" Text="INTERNET" VerticalAlignment="Center" Classes="eyebrow" Foreground="#A89095"/>
+                  </Grid>
+                  <ItemsControl Grid.Row="2" ItemsSource="{Binding Devices}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border MinHeight="68" BorderBrush="#2B2226" BorderThickness="0,0,0,1">
+                          <Grid ColumnDefinitions="2.2*,1.25*,1*,1*,1.25*,1.25*,1.05*">
+                            <Grid Margin="14,0,10,0" ColumnDefinitions="36,*" VerticalAlignment="Center">
+                              <Border Width="30" Height="30" HorizontalAlignment="Left" Classes="icon-surface">
+                                <Path Width="16" Height="16" Data="M2,3 H18 V14 H2 Z M7,18 H13 M10,14 V18"
+                                      Stroke="#D72C43" StrokeThickness="1.7" Stretch="Uniform" />
+                              </Border>
+                              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBox Classes="device-name" Text="{Binding EditableName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="18" Cursor="Arrow" FontWeight="SemiBold" IsVisible="{Binding CanControl}" />
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="#A89095" IsVisible="{Binding IsProtected}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding MacAddress}" FontSize="9" Foreground="#A89095"/><TextBlock Text="{Binding ProtectedReason}" FontSize="9" Foreground="#D72C43"/></StackPanel>
+                              </StackPanel>
+                            </Grid>
+                            <TextBlock Grid.Column="1" Text="{Binding IpAddress}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{Binding DownloadRate}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="{Binding UploadRate}" VerticalAlignment="Center" />
+                            <Border Grid.Column="4" Margin="8,12,12,12" Classes="limit-editor" IsEnabled="{Binding CanControl}"><Grid ColumnDefinitions="*,1,Auto"><TextBox Text="{Binding DownloadLimit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NonNegativeIntegerConverter}}" Padding="11,8" Background="Transparent" BorderThickness="0"/><Border Grid.Column="1" Margin="0,7" Background="#2B2226"/><TextBlock Grid.Column="2" Margin="7,0,8,0" Text="KB/s" Foreground="#A89095" FontSize="9" VerticalAlignment="Center"/></Grid></Border>
+                            <Border Grid.Column="5" Margin="8,12,12,12" Classes="limit-editor" IsEnabled="{Binding CanControl}"><Grid ColumnDefinitions="*,1,Auto"><TextBox Text="{Binding UploadLimit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NonNegativeIntegerConverter}}" Padding="11,8" Background="Transparent" BorderThickness="0"/><Border Grid.Column="1" Margin="0,7" Background="#2B2226"/><TextBlock Grid.Column="2" Margin="7,0,8,0" Text="KB/s" Foreground="#A89095" FontSize="9" VerticalAlignment="Center"/></Grid></Border>
+                            <ToggleSwitch Grid.Column="6" IsChecked="{Binding PauseInternet, Mode=TwoWay}" IsEnabled="{Binding CanControl}" OffContent="Paused" OnContent="Paused" VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel x:Name="EmptyDeviceText" Grid.Row="2" Margin="0,52" HorizontalAlignment="Center" Spacing="8">
+                    <Border Width="46" Height="46" HorizontalAlignment="Center" CornerRadius="13" Background="#171317">
+                      <Path Width="22" Height="22" Data="M2,3 H18 V14 H2 Z M7,18 H13 M10,14 V18" Stroke="#D72C43" StrokeThickness="1.7" Stretch="Uniform" />
+                    </Border>
+                    <TextBlock Text="No devices observed yet" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="Choose an adapter and start control to observe this LAN." Foreground="#A89095" HorizontalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+
+            </StackPanel>
+          </ScrollViewer>
+          <Border x:Name="OverviewStatusBar" Grid.Row="1" Classes="card" Margin="0,12,30,0" Padding="16,12">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock x:Name="StatusText" Text="Ready. Select an adapter and start control." Foreground="#A89095" TextWrapping="Wrap" VerticalAlignment="Center" />
+              <TextBlock x:Name="UptimeText" Grid.Column="1" Text="Idle" Foreground="#A89095" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+        </Grid>
+
+        <Grid x:Name="ActivityPage" IsVisible="False" Margin="12,26,30,18">
+          <Border Classes="card" ClipToBounds="True">
+          <Grid RowDefinitions="Auto,1,*,Auto">
+            <Grid Margin="20,18,20,14" ColumnDefinitions="*,Auto,Auto">
+              <StackPanel>
+                <TextBlock Text="VISITED DOMAINS" Classes="eyebrow" Foreground="#A89095" />
+                <TextBlock Text="Visited domains" FontSize="24" FontWeight="Bold" Margin="0,4,0,0" />
+                <TextBlock Text="Open a connected device to inspect the domains LANtern can observe." Foreground="#A89095" FontSize="12" Margin="0,5,0,0" />
+              </StackPanel>
+              <TextBlock x:Name="WebsiteActivityCountText" Grid.Column="1" Margin="16,0" Text="0 devices  •  0 domains" Foreground="#A89095" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Classes="action" Content="Clear activity" VerticalAlignment="Center" Click="ClearActivityButton_OnClick" />
+            </Grid>
+            <Border Grid.Row="1" Background="#2B2226" />
+            <ScrollViewer x:Name="ActivityPageScroll" Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+            <Grid MinHeight="260" Margin="16,10,16,16">
+              <StackPanel x:Name="ActivityEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="5" Margin="32">
+                <TextBlock Text="No connected devices" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="Start control and wait for devices to appear."
+                           Foreground="#A89095" TextAlignment="Center" />
+              </StackPanel>
+              <Grid x:Name="ActivityList" IsVisible="False">
+                <ItemsControl x:Name="ActivityGroups" HorizontalAlignment="Stretch" Classes="activity-groups" ItemsSource="{Binding DeviceActivityGroups}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Margin="0,0,0,10" HorizontalAlignment="Stretch" Background="#0C0B0D" BorderBrush="#2B2226" BorderThickness="1" CornerRadius="9">
+                        <Expander Classes="lantern-expander" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                          <Expander.Header>
+                            <Grid Margin="14,11,16,11" ColumnDefinitions="40,*,Auto,Auto" ColumnSpacing="12">
+                              <Border Width="30" Height="30" CornerRadius="8" Classes="icon-surface">
+                                <Path Width="16" Height="16" Data="M2,3 H18 V14 H2 Z M7,18 H13 M10,14 V18" Stroke="#D72C43" StrokeThickness="1.7" Stretch="Uniform" />
+                              </Border>
+                              <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding DeviceName}" FontWeight="SemiBold"/><TextBlock Text="{Binding IpAddress}" FontSize="10" Foreground="#A89095"/></StackPanel>
+                              <TextBlock Grid.Column="2" Margin="16,0,20,0" Text="{Binding DomainCountText}" Foreground="#D72C43" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                              <TextBlock Grid.Column="3" Text="{Binding LastSeenText}" Foreground="#A89095" VerticalAlignment="Center"/>
+                            </Grid>
+                          </Expander.Header>
+                          <Grid Margin="12,0,12,12" RowDefinitions="40,*" IsVisible="{Binding HasDomains}">
+                            <Border Background="#0A090B" BorderBrush="#2B2226" BorderThickness="1">
+                              <Grid ColumnDefinitions="3.1*,1.1*,1.25*,.65*,.9*">
+                                <TextBlock Margin="16,0" Text="DOMAIN" Classes="eyebrow" Foreground="#A89095" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="SIGNAL" Classes="eyebrow" Foreground="#A89095" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="LAST OBSERVED" Classes="eyebrow" Foreground="#A89095" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="HITS" Classes="eyebrow" Foreground="#A89095" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="4" Text="ACTION" Classes="eyebrow" Foreground="#A89095" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                              </Grid>
+                            </Border>
+                            <ScrollViewer Grid.Row="1" Classes="domain-scroll" MaxHeight="318">
+                              <ItemsControl HorizontalAlignment="Stretch" ItemsSource="{Binding Domains}">
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate>
+                                    <Border MinHeight="54" Background="#0D0C0E" BorderBrush="#2B2226" BorderThickness="1,0,1,1">
+                                      <Grid ColumnDefinitions="3.1*,1.1*,1.25*,.65*,.9*">
+                                        <Grid x:Name="SavedDomainIconCell" ColumnDefinitions="54,*" VerticalAlignment="Stretch">
+                                          <Border Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="7" Background="#160B0E" BorderBrush="#522029" BorderThickness="1">
+                                            <Viewbox x:Name="SavedDomainIconViewbox" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform">
+                                              <Canvas Width="20" Height="20">
+                                                <Path x:Name="SavedDomainIcon" Canvas.Left="2" Canvas.Top="6" Width="16" Height="8" Data="M0,8 L4,4 L7,6 L12,0 L16,3" Stroke="#D72C43" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round" Stretch="None" />
+                                              </Canvas>
+                                            </Viewbox>
+                                          </Border>
+                                          <TextBlock Grid.Column="1" Margin="0,0,8,0" Text="{Binding Domain}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <TextBlock Grid.Column="1" Text="{Binding SourceLabel}" Foreground="#D72C43" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                                          <Ellipse Width="5" Height="5" Fill="#D72C43" />
+                                          <TextBlock Text="{Binding LastSeenText}" FontFamily="DejaVu Sans Mono" FontSize="11" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="3" Text="{Binding HitCount}" FontFamily="DejaVu Sans Mono" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Button Grid.Column="4" Classes="action" Margin="8,10" MinWidth="72" MinHeight="32" Padding="12,5" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Content="{Binding BlockActionText}" IsEnabled="{Binding CanBlock}" Tag="{Binding}" Click="BlockDomainButton_OnClick" />
+                                      </Grid>
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </ScrollViewer>
+                          </Grid>
+                        </Expander>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Grid>
+            </Grid>
+            </ScrollViewer>
+            <Border x:Name="ActivityPageFooter" Grid.Row="3" Padding="20,12" Background="#0C0B0D" BorderBrush="#2B2226" BorderThickness="0,1,0,0">
+              <TextBlock Text="Domain metadata only  •  HTTPS pages, passwords, searches, and messages remain encrypted" Foreground="#A89095" FontSize="10" />
+            </Border>
+          </Grid>
+          </Border>
+        </Grid>
+
+        <Grid x:Name="RulesPage" IsVisible="False" Margin="12,26,30,18">
+          <Border Classes="card" ClipToBounds="True">
+            <Grid RowDefinitions="Auto,1,*,Auto">
+              <Grid Margin="20,18,20,14" ColumnDefinitions="*,Auto">
+                <StackPanel>
+                  <TextBlock Text="ACCESS CONTROL" Classes="eyebrow" Foreground="#A89095" />
+                  <TextBlock Text="Domain rules" FontSize="24" FontWeight="Bold" Margin="0,4,0,0" />
+                  <TextBlock Text="Block a domain for one device without decrypting HTTPS traffic." Foreground="#A89095" FontSize="12" Margin="0,5,0,0" />
+                </StackPanel>
+                <TextBlock x:Name="DomainRuleCountText" Grid.Column="1" Text="0 presets  •  0 rules" Foreground="#A89095" VerticalAlignment="Center" />
+              </Grid>
+              <Border Grid.Row="1" Background="#2B2226" />
+              <ScrollViewer x:Name="RulesPageScroll" Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" AllowAutoHide="False">
+              <StackPanel>
+              <Border Margin="20,18,20,0" Padding="16" CornerRadius="9" Background="#160B0E" BorderBrush="#522029" BorderThickness="1">
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="1.1*,1.15*,Auto">
+                  <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="DEVICE" Classes="eyebrow" Foreground="#A89095" />
+                    <ComboBox x:Name="RuleDeviceSelector" Margin="0,7,0,0" MinHeight="44" MinWidth="420" ItemsSource="{Binding DomainRuleDevices}" DisplayMemberBinding="{Binding DisplayName}" SelectedIndex="0" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                    <TextBlock Text="APP PRESET" Classes="eyebrow" Foreground="#A89095" />
+                    <ComboBox x:Name="PresetSelector" Margin="0,7,0,0" MinHeight="44" MinWidth="450" ItemsSource="{Binding DomainPresets}" DisplayMemberBinding="{Binding Name}" SelectedIndex="0" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Classes="action primary" Margin="0,17,0,0" Content="Apply preset" Click="ApplyPresetButton_OnClick" />
+                  <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Margin="2,11,0,0" Text="Blocks the app's related services and disables QUIC for this device so traffic falls back to inspectable TLS." Foreground="#A89095" FontSize="10" TextWrapping="Wrap" />
+                </Grid>
+              </Border>
+              <Border Margin="20,18,20,16" Padding="16" CornerRadius="9" Background="#0C0B0D" BorderBrush="#2B2226" BorderThickness="1">
+                <Grid ColumnDefinitions="1.1*,1.6*,Auto">
+                  <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="DEVICE" Classes="eyebrow" Foreground="#A89095" />
+                    <ComboBox Margin="0,7,0,0" MinHeight="44" MinWidth="365" ItemsSource="{Binding DomainRuleDevices}" DisplayMemberBinding="{Binding DisplayName}" SelectedItem="{Binding SelectedItem, ElementName=RuleDeviceSelector, Mode=TwoWay}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                    <TextBlock Text="DOMAIN" Classes="eyebrow" Foreground="#A89095" />
+                    <TextBox x:Name="CustomDomainTextBox" Margin="0,7,0,0" MinHeight="44" MinWidth="545" Watermark="example.com or *.example.com" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Classes="action primary" Margin="0,17,0,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Content="Add block" Click="AddCustomDomainButton_OnClick" />
+                </Grid>
+              </Border>
+              <Grid MinHeight="250" Margin="20,0,20,18">
+                <StackPanel x:Name="DomainRulesEmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8" Margin="24">
+                  <Border Width="46" Height="46" HorizontalAlignment="Center" CornerRadius="13" Background="#171317">
+                    <Path Width="21" Height="22" Data="M10,1 L18,4 V9 C18,14 14.7,18 10,20 C5.3,18 2,14 2,9 V4 Z M7,10 L9,12 L14,7" Stroke="#D72C43" StrokeThickness="1.7" Stretch="Uniform" />
+                  </Border>
+                  <TextBlock Text="No blocked domains" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                  <TextBlock Text="Choose a connected device and add a domain above." Foreground="#A89095" HorizontalAlignment="Center" />
+                </StackPanel>
+                <Grid x:Name="DomainRulesList" IsVisible="False">
+                  <StackPanel>
+                    <ItemsControl x:Name="DomainPresetRulesList" Classes="preset-rules" HorizontalAlignment="Stretch" ItemsSource="{Binding DomainPresetRules}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Border Margin="0,0,0,10" CornerRadius="9" Background="#0D0C0E" BorderBrush="#522029" BorderThickness="1" ClipToBounds="True">
+                            <Expander Classes="lantern-expander" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                              <Expander.Header>
+                                <Grid MinHeight="62" ColumnDefinitions="42,*,Auto">
+                                  <Border Width="30" Height="30" Classes="icon-surface" VerticalAlignment="Center"><Path Width="15" Height="16" Data="M10,1 L18,4 V9 C18,14 14.7,18 10,20 C5.3,18 2,14 2,9 V4 Z M7,10 L9,12 L14,7" Stroke="#D72C43" StrokeThickness="1.7" Stretch="Uniform"/></Border>
+                                  <StackPanel Grid.Column="1" VerticalAlignment="Center"><StackPanel Orientation="Horizontal" Spacing="9"><TextBlock Text="{Binding PresetName}" FontWeight="SemiBold"/><Border Padding="7,2" CornerRadius="5" Background="#160B0E"><TextBlock Text="PRESET" Foreground="#D72C43" FontSize="9" FontWeight="Bold"/></Border></StackPanel><TextBlock Text="{Binding DeviceName}" Margin="0,4,0,0" Foreground="#A89095" FontSize="10"/></StackPanel>
+                                  <TextBlock Grid.Column="2" Text="{Binding DomainCountText}" Foreground="#D72C43" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </Grid>
+                              </Expander.Header>
+                              <Border Margin="12,0,12,12" Padding="14,12" Background="#0A090B" BorderBrush="#2B2226" BorderThickness="1" CornerRadius="8">
+                                <StackPanel>
+                                  <TextBlock Text="BLOCKED DOMAINS" Foreground="#A89095" FontSize="9" FontWeight="SemiBold" Margin="2,0,0,8"/>
+                                  <ItemsControl ItemsSource="{Binding Domains}"><ItemsControl.ItemTemplate><DataTemplate><Grid MinHeight="31" ColumnDefinitions="16,*"><Ellipse Width="5" Height="5" Fill="#D72C43" HorizontalAlignment="Left"/><TextBlock Grid.Column="1" Text="{Binding}" VerticalAlignment="Center"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                                  <Button Classes="action danger" Margin="0,10,0,0" HorizontalAlignment="Right" Content="Remove preset" Tag="{Binding}" Click="RemovePresetButton_OnClick"/>
+                                </StackPanel>
+                              </Border>
+                            </Expander>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding DomainRules}"><ItemsControl.ItemTemplate><DataTemplate><Border MinHeight="62" Margin="0,0,0,10" Padding="16,13" CornerRadius="9" Background="#0D0C0E" BorderBrush="#2B2226" BorderThickness="1"><Grid ColumnDefinitions="42,1.7*,1.2*,Auto"><Border Width="30" Height="30" Classes="icon-surface" VerticalAlignment="Center"><Path Width="15" Height="16" Data="M10,1 L18,4 V9 C18,14 14.7,18 10,20 C5.3,18 2,14 2,9 V4 Z M7,10 L9,12 L14,7" Stroke="#D72C43" StrokeThickness="1.7" Stretch="Uniform"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Domain}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Margin="0,4,0,0" Text="{Binding DeviceName}" Foreground="#A89095" FontSize="10"/></StackPanel><StackPanel Grid.Column="2" Margin="18,0" VerticalAlignment="Center"><TextBlock Text="SCOPE" Foreground="#A89095" FontSize="9" FontWeight="SemiBold"/><TextBlock Margin="0,4,0,0" Text="{Binding ScopeText}" Foreground="#D72C43" FontSize="11"/></StackPanel><Button Grid.Column="3" Classes="action" MinWidth="82" MinHeight="34" Padding="13,6" VerticalAlignment="Center" Content="Remove" Tag="{Binding}" Click="RemoveRuleButton_OnClick"/></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                  </StackPanel>
+                </Grid>
+              </Grid>
+              </StackPanel>
+              </ScrollViewer>
+              <Border x:Name="RulesPageFooter" Grid.Row="3" Padding="20,12" Background="#0C0B0D" BorderBrush="#2B2226" BorderThickness="0,1,0,0">
+                <TextBlock Text="Blocks DNS, visible TLS hostnames, and plain HTTP  •  VPNs, encrypted DNS, and ECH can bypass domain rules" Foreground="#A89095" FontSize="10" />
+              </Border>
+            </Grid>
+          </Border>
+        </Grid>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

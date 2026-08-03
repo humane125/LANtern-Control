@@ -69,6 +69,7 @@ public sealed class ArpInterceptionFramesTests
         Assert.Equal(ClientMac.GetAddressBytes(), frame[..6]);
         Assert.Equal(LocalMac.GetAddressBytes(), frame[6..12]);
         Assert.True(EthernetFrameCodec.TryParseArp(frame, out var request));
+        Assert.False(request.HasConsistentSender);
         Assert.Equal(ArpOperation.Request, request.Operation);
         Assert.Equal(GatewayMac, request.SenderMac);
         Assert.Equal(GatewayIp, request.SenderIp);
@@ -87,7 +88,8 @@ public sealed class ArpInterceptionFramesTests
             ClientMac);
 
         Assert.True(EthernetFrameCodec.TryParseArp(frames.ToGateway, out var toGateway));
-        Assert.Equal(LocalMac, toGateway.EthernetSourceMac);
+        Assert.Equal(ClientMac, toGateway.EthernetSourceMac);
+        Assert.True(toGateway.HasConsistentSender);
         Assert.Equal(ClientMac, toGateway.SenderMac);
         Assert.Equal(ClientIp, toGateway.SenderIp);
         Assert.Equal(GatewayMac, toGateway.TargetMac);
@@ -95,6 +97,7 @@ public sealed class ArpInterceptionFramesTests
 
         Assert.True(EthernetFrameCodec.TryParseArp(frames.ToClient, out var toClient));
         Assert.Equal(LocalMac, toClient.EthernetSourceMac);
+        Assert.False(toClient.HasConsistentSender);
         Assert.Equal(GatewayMac, toClient.SenderMac);
         Assert.Equal(GatewayIp, toClient.SenderIp);
         Assert.Equal(ClientMac, toClient.TargetMac);

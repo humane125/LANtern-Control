@@ -1,10 +1,11 @@
 <Project Sdk="WixToolset.Sdk/5.0.2">
   <PropertyGroup>
     <OutputType>Package</OutputType>
-    <OutputName>LANtern-Control-Setup-v0.1.2</OutputName>
+    <OutputName>LANtern-Control-Setup-v0.1.3</OutputName>
     <OutputPath>..\packaging\wix\</OutputPath>
     <InstallerPlatform>x64</InstallerPlatform>
     <Cultures>en-US</Cultures>
+    <SuppressIces>ICE61</SuppressIces>
     <DefineConstants>PublishDir=$(PublishDir)</DefineConstants>
   </PropertyGroup>
 

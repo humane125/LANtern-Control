@@ -99,22 +99,20 @@ public sealed class TrafficChartScaleTests
     }
 
     [Fact]
-    public void GetRenderSamples_ReducesDenseHistoryAndPreservesEndpointsAndSpikes()
+    public void GetRenderSamples_KeepsEverySampleInTheTenMinuteWindow()
     {
         var start = DateTimeOffset.UnixEpoch;
-        var samples = Enumerable.Range(0, 2_700)
+        var samples = Enumerable.Range(0, 600)
             .Select(index => new TrafficSample(
                 start.AddSeconds(index),
-                index == 1_350 ? 50_000 : 1_000 + (index % 100),
+                index == 350 ? 50_000 : 1_000 + (index % 100),
                 100,
                 null))
             .ToArray();
 
         var rendered = TrafficChartScale.GetRenderSamples(samples, 320);
 
-        Assert.True(rendered.Count <= 320);
-        Assert.Same(samples[0], rendered[0]);
-        Assert.Same(samples[^1], rendered[^1]);
-        Assert.Contains(samples[1_350], rendered);
+        Assert.Same(samples, rendered);
+        Assert.Equal(600, rendered.Count);
     }
 }
