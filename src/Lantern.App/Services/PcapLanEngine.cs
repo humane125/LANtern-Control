@@ -16,7 +16,6 @@ public sealed class PcapLanEngine : IAsyncDisposable
     public static TimeSpan ProbeReplyWindow { get; } = TimeSpan.FromMilliseconds(800);
 
     private readonly object arpSendSync = new();
-    private readonly object forwardingSendSync = new();
     private readonly SemaphoreSlim refreshSync = new(1, 1);
     private readonly SemaphoreSlim stopSync = new(1, 1);
     private readonly TrafficPolicy policy;
@@ -161,7 +160,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 TimeSpan.FromSeconds(2),
                 cancellationToken);
 
-            await RefreshNeighborsAsync(cancellationToken);
+            await RefreshNeighborsAsync(engineCancellation.Token);
 
             PoisonClients();
             backgroundTask = Task.WhenAll(
@@ -174,11 +173,17 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
         catch (Exception exception)
         {
+            var forwardingFailure = backgroundFailure;
             Interlocked.CompareExchange(
                 ref backgroundFailure,
                 $"Startup failed: {exception.Message}",
                 null);
             await StopAsync();
+            if (forwardingFailure is not null)
+            {
+                throw new InvalidOperationException(forwardingFailure, exception);
+            }
+
             throw;
         }
     }
@@ -435,7 +440,6 @@ public sealed class PcapLanEngine : IAsyncDisposable
             profile = null;
             restoring = false;
             var failure = backgroundFailure;
-            backgroundFailure = null;
             var stoppedMessage = failure is null
                 ? "Stopped. Corrective ARP mappings were sent."
                 : $"Stopped after an engine error: {failure}. Corrective ARP mappings were sent.";
@@ -495,10 +499,19 @@ public sealed class PcapLanEngine : IAsyncDisposable
         {
             var activeDevice = forwardingDevice ??
                 throw new InvalidOperationException("The forwarding adapter is not open.");
-            forwarderStarted.TrySetResult();
+            var startupReported = false;
             while (!cancellationToken.IsCancellationRequested)
             {
                 var status = activeDevice.GetNextPacket(out var capture);
+                if (!startupReported)
+                {
+                    ForwarderStartupPolicy.ObserveFirstRead(
+                        forwarderStarted,
+                        status,
+                        activeDevice.LastError);
+                    startupReported = true;
+                }
+
                 if (status == GetPacketStatus.ReadTimeout)
                 {
                     continue;
@@ -955,9 +968,12 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
     private void SendForwardingPacket(byte[] bytes)
     {
-        var activeDevice = forwardingDevice ??
-            throw new InvalidOperationException("The forwarding adapter is not open.");
-        lock (forwardingSendSync)
+        // Some Wi-Fi drivers allow a second Npcap handle to capture but reject
+        // packet injection through it with ERROR_BAD_UNIT (20). The ARP handle
+        // has already proven that it can inject on this adapter, and capture
+        // filters do not restrict packets sent through a handle.
+        var activeDevice = PacketInjectionPolicy.SelectHandle(arpDevice, forwardingDevice);
+        lock (arpSendSync)
         {
             activeDevice.SendPacket(bytes);
         }
