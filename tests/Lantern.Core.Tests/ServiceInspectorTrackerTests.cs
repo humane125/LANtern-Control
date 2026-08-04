@@ -119,6 +119,57 @@ public sealed class ServiceInspectorTrackerTests
     }
 
     [Fact]
+    public void SharedMetaCdn_UsesRecentInstagramContextInsteadOfFacebook()
+    {
+        var tracker = new ServiceInspectorTracker();
+        tracker.Observe(
+            new FrameRouteResult(
+                FrameAction.Forward,
+                TrafficDirection.Upload,
+                Mac,
+                Observation: new DomainObservation(
+                    "i.instagram.com",
+                    DomainObservationSource.Dns,
+                    IPAddress.Parse("1.1.1.1"))),
+            Start);
+        tracker.Observe(
+            Result("video.xx.fbcdn.net", TrafficDirection.Download, 5_000),
+            Start.AddSeconds(1));
+
+        var snapshots = tracker.GetSnapshots(Start.AddSeconds(2.5));
+
+        var instagram = Assert.Single(snapshots, item => item.ServiceId == "instagram");
+        Assert.Equal(5_000, instagram.DownloadBytes);
+        Assert.DoesNotContain(snapshots, item => item.ServiceId == "facebook");
+    }
+
+    [Fact]
+    public void SharedMetaCdn_KeepsExistingFlowBoundWhenContextChanges()
+    {
+        var tracker = new ServiceInspectorTracker();
+        tracker.Observe(DnsObservation("i.instagram.com"), Start);
+        tracker.Observe(
+            Result("video.xx.fbcdn.net", TrafficDirection.Download, 1_000, 50001),
+            Start.AddSeconds(1));
+        tracker.Observe(DnsObservation("graph.facebook.com"), Start.AddSeconds(2));
+        tracker.Observe(
+            Result("video.xx.fbcdn.net", TrafficDirection.Download, 2_000, 50001),
+            Start.AddSeconds(3));
+        tracker.Observe(
+            Result("video.xx.fbcdn.net", TrafficDirection.Download, 3_000, 50002),
+            Start.AddSeconds(3));
+
+        var snapshots = tracker.GetSnapshots(Start.AddSeconds(4));
+
+        Assert.Equal(
+            3_000,
+            Assert.Single(snapshots, item => item.ServiceId == "instagram").DownloadBytes);
+        Assert.Equal(
+            3_000,
+            Assert.Single(snapshots, item => item.ServiceId == "facebook").DownloadBytes);
+    }
+
+    [Fact]
     public void CompleteAll_CheckpointsEveryOpenSessionExactlyOnce()
     {
         var tracker = new ServiceInspectorTracker();
@@ -148,4 +199,14 @@ public sealed class ServiceInspectorTrackerTests
             Flow: new ServiceFlowKey(MacKey, clientPort, remote, 443, 6),
             AttributedDomain: domain);
     }
+
+    private static FrameRouteResult DnsObservation(string domain) =>
+        new(
+            FrameAction.Forward,
+            TrafficDirection.Upload,
+            Mac,
+            Observation: new DomainObservation(
+                domain,
+                DomainObservationSource.Dns,
+                IPAddress.Parse("1.1.1.1")));
 }

@@ -10,6 +10,7 @@ public sealed class ServiceInspectorTracker
     private readonly object sync = new();
     private readonly Dictionary<ServiceFlowKey, FlowState> flows = [];
     private readonly Dictionary<SessionKey, SessionState> sessions = [];
+    private readonly Dictionary<string, RecentServiceContext> recentServiceContexts = [];
     private readonly List<CompletedServiceSession> completed = [];
 
     public void Observe(FrameRouteResult result, DateTimeOffset observedAt)
@@ -26,7 +27,10 @@ public sealed class ServiceInspectorTracker
 
             if (result.Observation is { } observation)
             {
-                var observedService = ServiceDefinitionCatalog.MatchDomain(observation.Domain);
+                var observedService = ResolveService(
+                    macKey,
+                    observation.Domain,
+                    observedAt);
                 if (observedService != ServiceDefinitionCatalog.Other)
                 {
                     _ = GetOrCreateSession(macKey, observedService, observedAt);
@@ -41,7 +45,13 @@ public sealed class ServiceInspectorTracker
             ServiceDefinition service;
             if (!string.IsNullOrWhiteSpace(result.AttributedDomain))
             {
-                service = ServiceDefinitionCatalog.MatchDomain(result.AttributedDomain);
+                service = IsSharedMetaCdn(result.AttributedDomain) &&
+                          flows.TryGetValue(flow, out var boundFlow)
+                    ? boundFlow.Service
+                    : ResolveService(
+                        macKey,
+                        result.AttributedDomain,
+                        observedAt);
                 flows[flow] = new FlowState(service, observedAt);
             }
             else if (flows.TryGetValue(flow, out var existingFlow))
@@ -140,7 +150,36 @@ public sealed class ServiceInspectorTracker
 
             sessions.Clear();
             flows.Clear();
+            recentServiceContexts.Clear();
         }
+    }
+
+    private ServiceDefinition ResolveService(
+        string macKey,
+        string domain,
+        DateTimeOffset observedAt)
+    {
+        var matched = ServiceDefinitionCatalog.MatchDomain(domain);
+        if (!IsSharedMetaCdn(domain))
+        {
+            if (IsMetaService(matched))
+            {
+                recentServiceContexts[macKey] = new RecentServiceContext(
+                    matched,
+                    observedAt);
+            }
+
+            return matched;
+        }
+
+        if (recentServiceContexts.TryGetValue(macKey, out var recent) &&
+            observedAt - recent.LastActivity < IdleTimeout)
+        {
+            recentServiceContexts[macKey] = recent with { LastActivity = observedAt };
+            return recent.Service;
+        }
+
+        return matched;
     }
 
     private SessionState GetOrCreateSession(
@@ -162,6 +201,14 @@ public sealed class ServiceInspectorTracker
 
     private void Expire(DateTimeOffset now)
     {
+        foreach (var macKey in recentServiceContexts
+                     .Where(pair => now - pair.Value.LastActivity >= IdleTimeout)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            recentServiceContexts.Remove(macKey);
+        }
+
         foreach (var flow in flows
                      .Where(pair => now - pair.Value.LastActivity >= IdleTimeout)
                      .Select(pair => pair.Key)
@@ -194,9 +241,23 @@ public sealed class ServiceInspectorTracker
 
     private readonly record struct SessionKey(string MacKey, string ServiceId);
 
+    private readonly record struct RecentServiceContext(
+        ServiceDefinition Service,
+        DateTimeOffset LastActivity);
+
     private sealed record FlowState(
         ServiceDefinition Service,
         DateTimeOffset LastActivity);
+
+    private static bool IsMetaService(ServiceDefinition service) =>
+        service.Id is "facebook" or "instagram" or "messenger";
+
+    private static bool IsSharedMetaCdn(string domain)
+    {
+        var normalized = domain.Trim().TrimEnd('.');
+        return normalized.Equals("fbcdn.net", StringComparison.OrdinalIgnoreCase) ||
+               normalized.EndsWith(".fbcdn.net", StringComparison.OrdinalIgnoreCase);
+    }
 
     private sealed class SessionState(
         string macKey,
