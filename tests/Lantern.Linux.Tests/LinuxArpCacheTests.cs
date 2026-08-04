@@ -2,11 +2,25 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using Lantern.Linux.Services;
+using Lantern.Core.Services;
+using Lantern.Core.Devices;
 
 namespace Lantern.Linux.Tests;
 
 public sealed class LinuxArpCacheTests
 {
+    [Fact]
+    public void Constructor_ExposesInjectedServiceInspectorTracker()
+    {
+        var tracker = new ServiceInspectorTracker();
+        var engine = new LinuxLanEngine(
+            new DeviceRegistry(),
+            new Lantern.Core.Control.TrafficPolicy(),
+            tracker);
+
+        Assert.Same(tracker, engine.ServiceInspector);
+    }
+
     [Fact]
     public void Parse_ReturnsCompleteUnicastNeighborsForSelectedAdapter()
     {

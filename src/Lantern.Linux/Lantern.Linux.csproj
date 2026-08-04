@@ -42,11 +42,14 @@
     <Compile Include="..\Lantern.App\ViewModels\DeviceActivityGroupViewModel.cs" Link="Shared\DeviceActivityGroupViewModel.cs" />
     <Compile Include="..\Lantern.App\ViewModels\DeviceActivityViewModel.cs" Link="Shared\DeviceActivityViewModel.cs" />
     <Compile Include="..\Lantern.App\ViewModels\DeviceViewModel.cs" Link="Shared\DeviceViewModel.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\DeviceServiceGroupViewModel.cs" Link="Shared\DeviceServiceGroupViewModel.cs" />
     <Compile Include="..\Lantern.App\ViewModels\DomainPresetRuleViewModel.cs" Link="Shared\DomainPresetRuleViewModel.cs" />
     <Compile Include="..\Lantern.App\ViewModels\DomainRuleViewModel.cs" Link="Shared\DomainRuleViewModel.cs" />
     <Compile Include="..\Lantern.App\ViewModels\TrafficHistory.cs" Link="Shared\TrafficHistory.cs" />
     <Compile Include="..\Lantern.App\ViewModels\TrafficSample.cs" Link="Shared\TrafficSample.cs" />
     <Compile Include="..\Lantern.App\ViewModels\TrafficSamplingProfile.cs" Link="Shared\TrafficSamplingProfile.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\ServiceInspectorPresentationBuilder.cs" Link="Shared\ServiceInspectorPresentationBuilder.cs" />
+    <Compile Include="..\Lantern.App\ViewModels\ServiceSessionViewModel.cs" Link="Shared\ServiceSessionViewModel.cs" />
     <Compile Include="..\Lantern.App\Controls\TrafficChartPresentation.cs" Link="Shared\TrafficChartPresentation.cs" />
     <Compile Include="..\Lantern.App\Controls\TrafficChartScale.cs" Link="Shared\TrafficChartScale.cs" />
   </ItemGroup>

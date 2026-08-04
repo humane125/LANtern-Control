@@ -5,6 +5,7 @@ using Lantern.App.Services;
 using Lantern.Core.Control;
 using Lantern.Core.Devices;
 using Lantern.Core.Networking;
+using Lantern.Core.Services;
 using SharpPcap;
 using SharpPcap.LibPcap;
 
@@ -51,15 +52,20 @@ public sealed class LinuxLanEngine : IAsyncDisposable
     private long droppedPacketCount;
     private long suppressedDuplicatePacketCount;
 
-    public LinuxLanEngine(DeviceRegistry registry, TrafficPolicy policy)
+    public LinuxLanEngine(
+        DeviceRegistry registry,
+        TrafficPolicy policy,
+        ServiceInspectorTracker? serviceInspector = null)
     {
         this.registry = registry;
         this.policy = policy;
+        ServiceInspector = serviceInspector ?? new ServiceInspectorTracker();
     }
 
     public bool IsRunning =>
         arpDevice is not null || forwardingDevice is not null || injectionDevice is not null;
     public bool IsControlling => controlling;
+    public ServiceInspectorTracker ServiceInspector { get; }
     public long ForwardedPacketCount => Interlocked.Read(ref forwardedPacketCount);
     public long DroppedPacketCount => Interlocked.Read(ref droppedPacketCount);
     public long SuppressedDuplicatePacketCount =>
@@ -641,6 +647,15 @@ public sealed class LinuxLanEngine : IAsyncDisposable
         }
 
         var result = frameRouter.Route(bytes);
+        var observedAt = DateTimeOffset.UtcNow;
+        try
+        {
+            ServiceInspector.Observe(result, observedAt);
+        }
+        catch (Exception)
+        {
+            // Usage accounting is optional telemetry. It must never interrupt forwarding.
+        }
         if (result.Direction is { } direction && result.ClientMac is { } clientMac)
         {
             registry.RecordTraffic(clientMac, direction, result.MeteredByteCount);
@@ -655,7 +670,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
                 new DeviceDomainObservedEventArgs(
                     domainClient,
                     observation,
-                    DateTimeOffset.UtcNow,
+                    observedAt,
                     result.BlockedByDomain));
         }
 

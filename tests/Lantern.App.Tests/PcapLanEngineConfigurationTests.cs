@@ -1,4 +1,7 @@
 using Lantern.App.Services;
+using Lantern.Core.Control;
+using Lantern.Core.Devices;
+using Lantern.Core.Services;
 using Lantern.Core.Settings;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -8,6 +11,15 @@ namespace Lantern.App.Tests;
 
 public sealed class PcapLanEngineConfigurationTests
 {
+    [Fact]
+    public void Constructor_ExposesInjectedServiceInspectorTracker()
+    {
+        var tracker = new ServiceInspectorTracker();
+        var engine = new PcapLanEngine(new DeviceRegistry(), new TrafficPolicy(), tracker);
+
+        Assert.Same(tracker, engine.ServiceInspector);
+    }
+
     [Fact]
     public void KnownDeviceHint_CarriesPersistedDhcpHostName()
     {

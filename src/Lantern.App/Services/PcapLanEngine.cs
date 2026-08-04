@@ -4,6 +4,7 @@ using System.Net.NetworkInformation;
 using Lantern.Core.Control;
 using Lantern.Core.Devices;
 using Lantern.Core.Networking;
+using Lantern.Core.Services;
 using SharpPcap;
 using SharpPcap.LibPcap;
 
@@ -44,15 +45,21 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private long forwardedPacketCount;
     private long droppedPacketCount;
 
-    public PcapLanEngine(DeviceRegistry registry, TrafficPolicy policy)
+    public PcapLanEngine(
+        DeviceRegistry registry,
+        TrafficPolicy policy,
+        ServiceInspectorTracker? serviceInspector = null)
     {
         this.registry = registry;
         this.policy = policy;
+        ServiceInspector = serviceInspector ?? new ServiceInspectorTracker();
     }
 
     public bool IsRunning => arpDevice is not null || forwardingDevice is not null;
 
     public bool IsControlling => controlling;
+
+    public ServiceInspectorTracker ServiceInspector { get; }
 
     public long ForwardedPacketCount => Interlocked.Read(ref forwardedPacketCount);
 
@@ -556,6 +563,15 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
 
         var result = frameRouter.Route(bytes);
+        var observedAt = DateTimeOffset.UtcNow;
+        try
+        {
+            ServiceInspector.Observe(result, observedAt);
+        }
+        catch (Exception)
+        {
+            // Usage accounting is optional telemetry. It must never interrupt forwarding.
+        }
         if (result.Direction is not null && result.ClientMac is not null)
         {
             registry.RecordTraffic(
@@ -573,7 +589,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 new DeviceDomainObservedEventArgs(
                     result.ClientMac,
                     observation,
-                    DateTimeOffset.UtcNow,
+                    observedAt,
                     result.BlockedByDomain));
         }
 
