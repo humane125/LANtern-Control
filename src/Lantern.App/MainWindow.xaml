@@ -1275,7 +1275,8 @@
                                                 BorderBrush="{StaticResource Border}"
                                                 BorderThickness="1"
                                                 CornerRadius="9">
-                                            <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                                            <Expander Style="{StaticResource ActivityExpanderStyle}"
+                                                      IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
                                                 <Expander.Header>
                                                     <Grid Margin="14,11,16,11">
                                                         <Grid.ColumnDefinitions>

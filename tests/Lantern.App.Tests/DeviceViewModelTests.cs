@@ -189,6 +189,15 @@ public sealed class DeviceViewModelTests
                     Assert.Equal("IsExpanded", expandedBinding.Path.Path);
                     Assert.Equal(BindingMode.TwoWay, expandedBinding.Mode);
 
+                    var serviceDeviceList = Assert.IsType<ItemsControl>(
+                        window.FindName("ServiceInspectorDeviceList"));
+                    var serviceItem = Assert.IsType<Border>(
+                        serviceDeviceList.ItemTemplate.LoadContent());
+                    var serviceExpander = Assert.IsType<Expander>(serviceItem.Child);
+                    Assert.Same(
+                        window.FindResource("ActivityExpanderStyle"),
+                        serviceExpander.Style);
+
                     var overviewSection = Assert.IsType<Grid>(window.FindName("OverviewSection"));
                     var websiteSection = Assert.IsType<Border>(
                         window.FindName("WebsiteActivitySection"));
