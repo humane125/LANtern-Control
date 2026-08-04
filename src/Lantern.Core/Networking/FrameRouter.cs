@@ -19,7 +19,16 @@ public sealed record FrameRouteResult(
     byte[]? Frame = null,
     int MeteredByteCount = 0,
     DomainObservation? Observation = null,
-    bool BlockedByDomain = false);
+    bool BlockedByDomain = false,
+    ServiceFlowKey? Flow = null,
+    string? AttributedDomain = null);
+
+public readonly record struct ServiceFlowKey(
+    string ClientMac,
+    ushort ClientPort,
+    IPAddress RemoteAddress,
+    ushort RemotePort,
+    byte Protocol);
 
 public sealed class FrameRouter
 {
@@ -30,7 +39,7 @@ public sealed class FrameRouter
     private readonly TrafficPolicy policy;
     private readonly bool enforceRateLimits;
     private readonly ConcurrentDictionary<IPAddress, PhysicalAddress> clients;
-    private readonly ConcurrentDictionary<ObservedFlowKey, string> observedFlowDomains = [];
+    private readonly ConcurrentDictionary<ServiceFlowKey, string> observedFlowDomains = [];
 
     public FrameRouter(
         PhysicalAddress localMac,
@@ -129,9 +138,10 @@ public sealed class FrameRouter
         DomainObservation? observation,
         TransportFlow? transportFlow)
     {
-        ObservedFlowKey? flowKey = transportFlow is { } flow
+        ServiceFlowKey? flowKey = transportFlow is { } flow
             ? CreateFlowKey(clientMac, direction, flow)
             : null;
+        string? attributedDomain = null;
         if (direction == TrafficDirection.Upload &&
             observation is { Source: not DomainObservationSource.Dns } observedDomain &&
             flowKey is { } observedKey)
@@ -142,6 +152,7 @@ public sealed class FrameRouter
             }
 
             observedFlowDomains[observedKey] = observedDomain.Domain;
+            attributedDomain = observedDomain.Domain;
         }
 
         if (flowKey is { } knownKey &&
@@ -153,7 +164,15 @@ public sealed class FrameRouter
                 direction,
                 clientMac,
                 Observation: observation,
-                BlockedByDomain: true);
+                BlockedByDomain: true,
+                Flow: flowKey,
+                AttributedDomain: knownDomain);
+        }
+
+        if (flowKey is { } attributedKey &&
+            observedFlowDomains.TryGetValue(attributedKey, out var rememberedDomain))
+        {
+            attributedDomain = rememberedDomain;
         }
 
         if (direction == TrafficDirection.Upload &&
@@ -164,7 +183,8 @@ public sealed class FrameRouter
                 FrameAction.Drop,
                 direction,
                 clientMac,
-                BlockedByDomain: true);
+                BlockedByDomain: true,
+                Flow: flowKey);
         }
 
         if (direction == TrafficDirection.Upload &&
@@ -176,7 +196,11 @@ public sealed class FrameRouter
                 direction,
                 clientMac,
                 Observation: outbound,
-                BlockedByDomain: true);
+                BlockedByDomain: true,
+                Flow: flowKey,
+                AttributedDomain: outbound.Source == DomainObservationSource.Dns
+                    ? null
+                    : outbound.Domain);
         }
 
         var shouldForward = enforceRateLimits
@@ -188,7 +212,9 @@ public sealed class FrameRouter
                 FrameAction.Drop,
                 direction,
                 clientMac,
-                Observation: observation);
+                Observation: observation,
+                Flow: observation is { Source: DomainObservationSource.Dns } ? null : flowKey,
+                AttributedDomain: attributedDomain);
         }
 
         return new FrameRouteResult(
@@ -200,31 +226,26 @@ public sealed class FrameRouter
                 localMac,
                 destinationMac),
             meteredByteCount,
-            observation);
+            observation,
+            Flow: observation is { Source: DomainObservationSource.Dns } ? null : flowKey,
+            AttributedDomain: attributedDomain);
     }
 
-    private static ObservedFlowKey CreateFlowKey(
+    private static ServiceFlowKey CreateFlowKey(
         PhysicalAddress clientMac,
         TrafficDirection direction,
         TransportFlow flow) =>
         direction == TrafficDirection.Upload
-            ? new ObservedFlowKey(
+            ? new ServiceFlowKey(
                 TrafficPolicy.NormalizeMac(clientMac.ToString()),
                 flow.SourcePort,
                 flow.DestinationAddress,
                 flow.DestinationPort,
                 flow.Protocol)
-            : new ObservedFlowKey(
+            : new ServiceFlowKey(
                 TrafficPolicy.NormalizeMac(clientMac.ToString()),
                 flow.DestinationPort,
                 flow.SourceAddress,
                 flow.SourcePort,
                 flow.Protocol);
-
-    private readonly record struct ObservedFlowKey(
-        string ClientMac,
-        ushort ClientPort,
-        IPAddress RemoteAddress,
-        ushort RemotePort,
-        byte Protocol);
 }

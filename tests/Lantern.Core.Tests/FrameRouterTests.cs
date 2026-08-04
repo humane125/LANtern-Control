@@ -182,6 +182,52 @@ public sealed class FrameRouterTests
     }
 
     [Fact]
+    public void Route_ReusesTlsHostnameAndCanonicalKeyForReverseDownloadFlow()
+    {
+        var router = CreateRouter();
+        var remoteIp = IPAddress.Parse("142.250.186.110");
+        const ushort clientPort = 51000;
+        var clientHello = BuildTcpPayloadFrame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            remoteIp,
+            clientPort,
+            443,
+            BuildTlsClientHello("www.youtube.com"));
+        var download = BuildTcpPayloadFrame(
+            LocalMac,
+            GatewayMac,
+            remoteIp,
+            ClientIp,
+            443,
+            clientPort,
+            [0x17, 0x03, 0x03, 0x00, 0x20]);
+
+        var uploadResult = router.Route(clientHello);
+        var downloadResult = router.Route(download);
+
+        Assert.Equal("www.youtube.com", uploadResult.AttributedDomain);
+        Assert.Equal("www.youtube.com", downloadResult.AttributedDomain);
+        Assert.NotNull(uploadResult.Flow);
+        Assert.Equal(uploadResult.Flow, downloadResult.Flow);
+        Assert.Equal(clientPort, downloadResult.Flow!.Value.ClientPort);
+        Assert.Equal(remoteIp, downloadResult.Flow.Value.RemoteAddress);
+    }
+
+    [Fact]
+    public void Route_DnsObservationDoesNotBindResolverFlowToQueriedService()
+    {
+        var router = CreateRouter();
+
+        var result = router.Route(BuildDnsQueryFrame("youtube.com"));
+
+        Assert.Equal("youtube.com", result.Observation?.Domain);
+        Assert.Null(result.AttributedDomain);
+        Assert.Null(result.Flow);
+    }
+
+    [Fact]
     public void Route_LocalComputerTrafficIsIgnored()
     {
         var router = CreateRouter();
