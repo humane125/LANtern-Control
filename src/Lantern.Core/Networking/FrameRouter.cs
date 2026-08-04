@@ -118,7 +118,7 @@ public sealed class FrameRouter
             ipv4.SourceMac.Equals(gatewayMac) &&
             clients.TryGetValue(ipv4.Destination, out var downloadClientMac))
         {
-            RememberDnsResolution(frame, downloadClientMac);
+            var isDnsResponse = RememberDnsResolution(frame, downloadClientMac);
             return RouteForClient(
                 frame,
                 downloadClientMac,
@@ -126,7 +126,7 @@ public sealed class FrameRouter
                 downloadClientMac,
                 ipv4.TransportPayloadLength,
                 null,
-                transportFlow);
+                isDnsResponse ? null : transportFlow);
         }
 
         return new FrameRouteResult(FrameAction.Ignore);
@@ -283,13 +283,13 @@ public sealed class FrameRouter
                 flow.SourcePort,
                 flow.Protocol);
 
-    private void RememberDnsResolution(
+    private bool RememberDnsResolution(
         ReadOnlySpan<byte> frame,
         PhysicalAddress clientMac)
     {
         if (!NetworkActivityParser.TryParseDnsResponse(frame, out var resolution))
         {
-            return;
+            return false;
         }
 
         if (resolvedDomains.Count >= MaxResolvedAddresses)
@@ -306,6 +306,8 @@ public sealed class FrameRouter
                     resolution.Domain,
                     now + resolvedAddress.Lifetime);
         }
+
+        return true;
     }
 
     private readonly record struct ResolvedAddressKey(

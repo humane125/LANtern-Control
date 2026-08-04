@@ -238,7 +238,7 @@ public sealed class FrameRouterTests
         var router = CreateRouter();
         var serviceAddress = IPAddress.Parse("142.250.186.110");
 
-        _ = router.Route(BuildDnsResponseFrame(domain, serviceAddress));
+        var dnsResult = router.Route(BuildDnsResponseFrame(domain, serviceAddress));
         var result = router.Route(BuildUdpPayloadFrame(
             LocalMac,
             ClientMac,
@@ -248,6 +248,7 @@ public sealed class FrameRouterTests
             443,
             [0xc0, 0x00, 0x00, 0x00]));
 
+        Assert.Null(dnsResult.Flow);
         Assert.Equal(FrameAction.Forward, result.Action);
         Assert.Equal(domain, result.AttributedDomain);
         Assert.Equal(

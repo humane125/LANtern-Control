@@ -192,11 +192,6 @@ public static class NetworkActivityParser
             offset += dataLength;
         }
 
-        if (addresses.Count == 0)
-        {
-            return false;
-        }
-
         resolution = new DnsResolution(normalizedDomain, addresses);
         return true;
     }
