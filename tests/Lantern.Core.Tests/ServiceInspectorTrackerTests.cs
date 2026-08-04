@@ -118,6 +118,70 @@ public sealed class ServiceInspectorTrackerTests
         Assert.Equal(900, snapshot.DownloadBytes);
     }
 
+    [Theory]
+    [InlineData(6)]
+    [InlineData(17)]
+    public void UnknownEncryptedFlow_UsesRecentInstagramContext(byte protocol)
+    {
+        var tracker = new ServiceInspectorTracker();
+        tracker.Observe(DnsObservation("i.instagram.com"), Start);
+        tracker.Observe(
+            Result(
+                null,
+                TrafficDirection.Download,
+                5_000,
+                clientPort: 50001,
+                remotePort: 443,
+                protocol: protocol),
+            Start.AddSeconds(1));
+
+        var snapshots = tracker.GetSnapshots(Start.AddSeconds(2.5));
+
+        Assert.Equal(
+            5_000,
+            Assert.Single(snapshots, item => item.ServiceId == "instagram").DownloadBytes);
+        Assert.DoesNotContain(snapshots, item => item.ServiceId == "other");
+    }
+
+    [Fact]
+    public void ExistingUnknownEncryptedFlow_RebindsWhenInstagramContextAppears()
+    {
+        var tracker = new ServiceInspectorTracker();
+        tracker.Observe(Result(null, TrafficDirection.Download, 1_000), Start);
+        tracker.Observe(DnsObservation("i.instagram.com"), Start.AddSeconds(1));
+        tracker.Observe(Result(null, TrafficDirection.Download, 5_000), Start.AddSeconds(2));
+
+        var snapshots = tracker.GetSnapshots(Start.AddSeconds(2.5));
+
+        Assert.Equal(
+            5_000,
+            Assert.Single(snapshots, item => item.ServiceId == "instagram").DownloadBytes);
+        Assert.Equal(
+            1_000,
+            Assert.Single(snapshots, item => item.ServiceId == "other").DownloadBytes);
+    }
+
+    [Fact]
+    public void UnknownNonEncryptedFlow_RemainsOtherDespiteRecentInstagramContext()
+    {
+        var tracker = new ServiceInspectorTracker();
+        tracker.Observe(DnsObservation("i.instagram.com"), Start);
+        tracker.Observe(
+            Result(
+                null,
+                TrafficDirection.Download,
+                900,
+                remotePort: 80,
+                protocol: 6),
+            Start.AddSeconds(1));
+
+        var snapshots = tracker.GetSnapshots(Start.AddSeconds(2.5));
+
+        Assert.Equal(
+            900,
+            Assert.Single(snapshots, item => item.ServiceId == "other").DownloadBytes);
+    }
+
     [Fact]
     public void SharedMetaCdn_UsesRecentInstagramContextInsteadOfFacebook()
     {
@@ -188,7 +252,9 @@ public sealed class ServiceInspectorTrackerTests
         string? domain,
         TrafficDirection direction,
         int bytes,
-        ushort clientPort = 50001)
+        ushort clientPort = 50001,
+        ushort remotePort = 443,
+        byte protocol = 6)
     {
         var remote = IPAddress.Parse("142.250.186.110");
         return new FrameRouteResult(
@@ -196,7 +262,7 @@ public sealed class ServiceInspectorTrackerTests
             direction,
             Mac,
             MeteredByteCount: bytes,
-            Flow: new ServiceFlowKey(MacKey, clientPort, remote, 443, 6),
+            Flow: new ServiceFlowKey(MacKey, clientPort, remote, remotePort, protocol),
             AttributedDomain: domain);
     }
 

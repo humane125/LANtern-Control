@@ -56,12 +56,25 @@ public sealed class ServiceInspectorTracker
             }
             else if (flows.TryGetValue(flow, out var existingFlow))
             {
-                service = existingFlow.Service;
-                flows[flow] = existingFlow with { LastActivity = observedAt };
+                service = existingFlow.Service == ServiceDefinitionCatalog.Other &&
+                          TryResolveRecentEncryptedMetaContext(
+                              macKey,
+                              flow,
+                              observedAt,
+                              out var reboundService)
+                    ? reboundService
+                    : existingFlow.Service;
+                flows[flow] = new FlowState(service, observedAt);
             }
             else
             {
-                service = ServiceDefinitionCatalog.Other;
+                service = TryResolveRecentEncryptedMetaContext(
+                    macKey,
+                    flow,
+                    observedAt,
+                    out var contextualService)
+                    ? contextualService
+                    : ServiceDefinitionCatalog.Other;
                 flows[flow] = new FlowState(service, observedAt);
             }
 
@@ -251,6 +264,25 @@ public sealed class ServiceInspectorTracker
 
     private static bool IsMetaService(ServiceDefinition service) =>
         service.Id is "facebook" or "instagram" or "messenger";
+
+    private bool TryResolveRecentEncryptedMetaContext(
+        string macKey,
+        ServiceFlowKey flow,
+        DateTimeOffset observedAt,
+        out ServiceDefinition service)
+    {
+        if (flow.RemotePort == 443 &&
+            flow.Protocol is 6 or 17 &&
+            recentServiceContexts.TryGetValue(macKey, out var recent) &&
+            observedAt - recent.LastActivity < IdleTimeout)
+        {
+            service = recent.Service;
+            return true;
+        }
+
+        service = ServiceDefinitionCatalog.Other;
+        return false;
+    }
 
     private static bool IsSharedMetaCdn(string domain)
     {
