@@ -7,6 +7,22 @@ namespace Lantern.App.Tests;
 public sealed class ForwarderStartupPolicyTests
 {
     [Fact]
+    public void ForwardedPackets_AreNormalizedBeforeInjection()
+    {
+        var frame = new byte[1_600];
+        frame[12] = 0x08;
+        frame[13] = 0x00;
+        frame[14] = 0x45;
+        frame[16] = 0x00;
+        frame[17] = 0x28;
+
+        var prepared = PacketInjectionPolicy.PrepareFrames(frame);
+
+        Assert.Single(prepared);
+        Assert.Equal(54, prepared[0].Length);
+    }
+
+    [Fact]
     public void ForwardedPackets_UseTheEstablishedCaptureHandle()
     {
         var establishedCaptureHandle = new object();

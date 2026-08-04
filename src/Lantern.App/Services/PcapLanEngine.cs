@@ -973,9 +973,26 @@ public sealed class PcapLanEngine : IAsyncDisposable
         // has already proven that it can inject on this adapter, and capture
         // filters do not restrict packets sent through a handle.
         var activeDevice = PacketInjectionPolicy.SelectHandle(arpDevice, forwardingDevice);
-        lock (arpSendSync)
+        var frames = PacketInjectionPolicy.PrepareFrames(bytes);
+        for (var index = 0; index < frames.Count; index++)
         {
-            activeDevice.SendPacket(bytes);
+            var frame = frames[index];
+            try
+            {
+                lock (arpSendSync)
+                {
+                    activeDevice.SendPacket(frame);
+                }
+            }
+            catch (Exception exception)
+            {
+                var adapterName = profile?.Name ?? "unknown adapter";
+                throw new InvalidOperationException(
+                    $"Npcap rejected a forwarded frame on '{adapterName}' " +
+                    $"(captured {bytes.Length} bytes, sending {frame.Length} bytes, " +
+                    $"segment {index + 1}/{frames.Count}): {exception.Message}",
+                    exception);
+            }
         }
     }
 

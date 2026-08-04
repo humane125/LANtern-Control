@@ -1,4 +1,5 @@
 using SharpPcap;
+using Lantern.Core.Networking;
 
 namespace Lantern.App.Services;
 
@@ -23,6 +24,9 @@ public static class ForwarderStartupPolicy
 
 public static class PacketInjectionPolicy
 {
+    public static IReadOnlyList<byte[]> PrepareFrames(ReadOnlySpan<byte> capturedFrame) =>
+        Ipv4FrameNormalizer.Normalize(capturedFrame);
+
     public static T SelectHandle<T>(T? establishedCaptureHandle, T? secondaryHandle)
         where T : class =>
         establishedCaptureHandle ?? secondaryHandle ??
