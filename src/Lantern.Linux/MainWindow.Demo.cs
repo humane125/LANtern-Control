@@ -6,6 +6,7 @@ using Lantern.Core.Control;
 using Lantern.Core.Devices;
 using Lantern.Core.Networking;
 using Lantern.Core.Settings;
+using Lantern.Core.Services;
 using Lantern.Linux.ViewModels;
 
 namespace Lantern.Linux;
@@ -88,6 +89,7 @@ public partial class MainWindow
         AddDemoActivity(DemoDevices[2], "instagram.com", DomainObservationSource.Dns, 16, true, DomainObservationSource.Tls);
         AddDemoActivity(DemoDevices[2], "cdninstagram.com", DomainObservationSource.Tls, 11, true);
         AddDemoActivity(DemoDevices[3], "discord.com", DomainObservationSource.Dns, 7, false, DomainObservationSource.Tls);
+        LoadDemoServiceInspector(now);
 
         trafficHistory.Clear();
         for (var index = 89; index >= 0; index--)
@@ -178,6 +180,47 @@ public partial class MainWindow
                 observedAt.AddMilliseconds(index * 40),
                 blocked));
         }
+    }
+
+    private void LoadDemoServiceInspector(DateTimeOffset now)
+    {
+        ServiceSessionSnapshot[] snapshots =
+        [
+            new(DemoDevices[0].MacKey, "youtube", "YouTube", now.AddMinutes(-12),
+                now.AddSeconds(-2), TimeSpan.FromMinutes(12), 1_840_000_000, 24_000_000,
+                1_920_000, 18_400, 6, true),
+            new(DemoDevices[0].MacKey, "discord", "Discord", now.AddMinutes(-7),
+                now.AddSeconds(-4), TimeSpan.FromMinutes(7), 86_000_000, 31_000_000,
+                62_000, 14_500, 4, true),
+            new(DemoDevices[1].MacKey, "netflix", "Netflix", now.AddMinutes(-18),
+                now.AddSeconds(-1), TimeSpan.FromMinutes(18), 3_240_000_000, 8_400_000,
+                1_080_000, 2_800, 5, true),
+            new(DemoDevices[2].MacKey, "instagram", "Instagram", now.AddMinutes(-5),
+                now.AddSeconds(-3), TimeSpan.FromMinutes(5), 216_000_000, 12_000_000,
+                420_000, 27_000, 3, true),
+            new(DemoDevices[3].MacKey, "steam", "Steam", now.AddMinutes(-22),
+                now.AddSeconds(-8), TimeSpan.FromMinutes(22), 4_760_000_000, 42_000_000,
+                510_000, 8_400, 8, true),
+        ];
+        var identities = DemoDevices.ToDictionary(
+            seed => seed.MacKey,
+            seed => new ServiceDeviceIdentity(seed.Name, seed.IpAddress),
+            StringComparer.OrdinalIgnoreCase);
+        var groups = ServiceInspectorPresentationBuilder.Build(
+            snapshots,
+            identities,
+            new ServiceUsageHistory(),
+            now,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        ServiceDeviceGroups.Clear();
+        foreach (var group in groups)
+        {
+            ServiceDeviceGroups.Add(group);
+        }
+
+        ServiceInspectorList.IsVisible = true;
+        ServiceInspectorEmptyState.IsVisible = false;
+        ServiceInspectorCountText.Text = $"{groups.Count} devices  •  {groups.Sum(group => group.Services.Count)} services";
     }
 
     private static DeviceSnapshot CreateDemoSnapshot(

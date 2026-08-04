@@ -34,6 +34,8 @@ public partial class MainWindow : Window
     private readonly DeviceRegistry registry = new();
     private readonly TrafficPolicy policy = new();
     private readonly SettingsStore settingsStore = new();
+    private readonly ServiceUsageHistoryStore serviceHistoryStore = new();
+    private readonly SemaphoreSlim serviceHistorySaveSync = new(1, 1);
     private readonly GitHubUpdateChecker updateChecker = new(UpdateHttpClient);
     private readonly TrafficHistory trafficHistory = new(
         TrafficSamplingProfile.Capacity,
@@ -47,6 +49,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer refreshTimer;
     private readonly LinuxLanEngine engine;
     private AppSettings settings = new();
+    private ServiceUsageHistory serviceHistory = new();
     private LinuxDashboardState dashboardState;
     private DateTimeOffset? startedAt;
     private bool closingAfterRestore;
@@ -82,6 +85,7 @@ public partial class MainWindow : Window
     public ObservableCollection<DeviceViewModel> Devices { get; } = [];
     public ObservableCollection<DeviceViewModel> DomainRuleDevices { get; } = [];
     public ObservableCollection<DeviceActivityGroupViewModel> DeviceActivityGroups { get; } = [];
+    public ObservableCollection<DeviceServiceGroupViewModel> ServiceDeviceGroups { get; } = [];
     public ObservableCollection<DomainPresetRuleViewModel> DomainPresetRules { get; } = [];
     public ObservableCollection<DomainRuleViewModel> DomainRules { get; } = [];
     public IReadOnlyList<DomainBlockPreset> DomainPresets => DomainBlockPresetCatalog.All;
@@ -96,6 +100,7 @@ public partial class MainWindow : Window
         }
 
         settings = await settingsStore.LoadAsync();
+        serviceHistory = await serviceHistoryStore.LoadAsync();
         dashboardState = new LinuxDashboardState(settings, policy);
         ApplyAllSavedRules();
         LoadDomainRulesFromSettings();
@@ -268,6 +273,8 @@ public partial class MainWindow : Window
         {
             SetStatus("Restoring normal ARP mappings...");
             await engine.StopAsync();
+            engine.ServiceInspector.CompleteAll(DateTimeOffset.UtcNow);
+            await PersistCompletedServiceSessionsAsync(DateTimeOffset.UtcNow);
             startedAt = null;
             SetActiveState(false);
         }
@@ -332,6 +339,7 @@ public partial class MainWindow : Window
         SyncWebsiteActivityGroups();
         SyncDomainRuleDevices();
         UpdateActivityIdentities();
+        RefreshServiceInspector(now);
 
         var summary = DashboardSummary.From(Devices.Where(device => device.IsOnline));
         DeviceCountText.Text = summary.ConnectedDevices.ToString();
@@ -450,6 +458,11 @@ public partial class MainWindow : Window
             startedAt = eventArgs.IsRunning
                 ? startedAt ?? DateTimeOffset.UtcNow
                 : null;
+            if (!eventArgs.IsRunning)
+            {
+                engine.ServiceInspector.CompleteAll(DateTimeOffset.UtcNow);
+                _ = PersistCompletedServiceSessionsAsync(DateTimeOffset.UtcNow);
+            }
             SetActiveState(eventArgs.IsRunning);
             SetStatus(eventArgs.StatusMessage);
             UpdateButtons();
@@ -779,21 +792,87 @@ public partial class MainWindow : Window
 
     private void OverviewNavButton_OnClick(object? sender, RoutedEventArgs eventArgs) => ShowPage(OverviewPage, OverviewNavButton);
     private void ActivityNavButton_OnClick(object? sender, RoutedEventArgs eventArgs) => ShowPage(ActivityPage, ActivityNavButton);
+    private void ServiceInspectorNavButton_OnClick(object? sender, RoutedEventArgs eventArgs) =>
+        ShowPage(ServiceInspectorPage, ServiceInspectorNavButton);
     private void RulesNavButton_OnClick(object? sender, RoutedEventArgs eventArgs) => ShowPage(RulesPage, RulesNavButton);
 
     private void ShowPage(Control page, Button activeButton)
     {
         OverviewPage.IsVisible = ReferenceEquals(page, OverviewPage);
         ActivityPage.IsVisible = ReferenceEquals(page, ActivityPage);
+        ServiceInspectorPage.IsVisible = ReferenceEquals(page, ServiceInspectorPage);
         RulesPage.IsVisible = ReferenceEquals(page, RulesPage);
-        foreach (var button in new[] { OverviewNavButton, ActivityNavButton, RulesNavButton })
+        foreach (var button in new[]
+                 {
+                     OverviewNavButton,
+                     ActivityNavButton,
+                     ServiceInspectorNavButton,
+                     RulesNavButton,
+                 })
         {
             button.Classes.Set("active", ReferenceEquals(button, activeButton));
         }
 
         OverviewNavIcon.Fill = ReferenceEquals(activeButton, OverviewNavButton) ? AccentBrush : InactiveNavBrush;
         ActivityNavIcon.Stroke = ReferenceEquals(activeButton, ActivityNavButton) ? AccentBrush : InactiveNavBrush;
+        ServiceInspectorNavIcon.Stroke = ReferenceEquals(activeButton, ServiceInspectorNavButton)
+            ? AccentBrush
+            : InactiveNavBrush;
         RulesNavIcon.Stroke = ReferenceEquals(activeButton, RulesNavButton) ? AccentBrush : InactiveNavBrush;
+    }
+
+    private void RefreshServiceInspector(DateTimeOffset now)
+    {
+        var expanded = ServiceDeviceGroups
+            .Where(group => group.IsExpanded)
+            .Select(group => group.MacKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var identities = Devices.ToDictionary(
+            device => device.MacKey,
+            device => new ServiceDeviceIdentity(device.DisplayName, device.IpAddress),
+            StringComparer.OrdinalIgnoreCase);
+        var groups = ServiceInspectorPresentationBuilder.Build(
+            engine.ServiceInspector.GetSnapshots(now),
+            identities,
+            serviceHistory,
+            now,
+            expanded);
+        ServiceDeviceGroups.Clear();
+        foreach (var group in groups)
+        {
+            ServiceDeviceGroups.Add(group);
+        }
+
+        ServiceInspectorList.IsVisible = groups.Count > 0;
+        ServiceInspectorEmptyState.IsVisible = groups.Count == 0;
+        var serviceCount = groups.Sum(group => group.Services.Count);
+        ServiceInspectorCountText.Text =
+            $"{groups.Count} device{(groups.Count == 1 ? string.Empty : "s")}  •  " +
+            $"{serviceCount} service{(serviceCount == 1 ? string.Empty : "s")}";
+        _ = PersistCompletedServiceSessionsAsync(now);
+    }
+
+    private async Task PersistCompletedServiceSessionsAsync(DateTimeOffset now)
+    {
+        await serviceHistorySaveSync.WaitAsync();
+        try
+        {
+            var completed = engine.ServiceInspector.DrainCompletedSessions(now);
+            if (completed.Count == 0)
+            {
+                return;
+            }
+
+            serviceHistory = await serviceHistoryStore.MergeAndSaveAsync(completed);
+        }
+        catch (Exception exception)
+        {
+            Dispatcher.UIThread.Post(() => SetStatus(exception.Message));
+        }
+        finally
+        {
+            serviceHistorySaveSync.Release();
+        }
     }
 
     private void TitleBar_OnPointerPressed(object? sender, PointerPressedEventArgs eventArgs)

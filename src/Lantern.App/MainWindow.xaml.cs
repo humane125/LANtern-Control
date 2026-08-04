@@ -31,7 +31,9 @@ public partial class MainWindow : Window
     private readonly DeviceRegistry registry = new();
     private readonly TrafficPolicy policy = new();
     private readonly SettingsStore settingsStore = new();
+    private readonly ServiceUsageHistoryStore serviceHistoryStore = new();
     private readonly SemaphoreSlim identitySaveSync = new(1, 1);
+    private readonly SemaphoreSlim serviceHistorySaveSync = new(1, 1);
     private readonly DispatcherTimer refreshTimer;
     private readonly Dictionary<string, DeviceViewModel> deviceIndex =
         new(StringComparer.OrdinalIgnoreCase);
@@ -43,6 +45,7 @@ public partial class MainWindow : Window
     private readonly GitHubUpdateChecker updateChecker = new(UpdateHttpClient);
     private PcapLanEngine engine;
     private AppSettings settings = new();
+    private ServiceUsageHistory serviceHistory = new();
     private DateTimeOffset? controlStartedAt;
     private bool operationInProgress;
     private bool closeAfterStop;
@@ -103,6 +106,8 @@ public partial class MainWindow : Window
 
     public ObservableCollection<DeviceActivityGroupViewModel> DeviceActivityGroups { get; } = [];
 
+    public ObservableCollection<DeviceServiceGroupViewModel> ServiceDeviceGroups { get; } = [];
+
     public ObservableCollection<DeviceViewModel> DomainRuleDevices { get; } = [];
 
     public ObservableCollection<DomainRuleViewModel> DomainRules { get; } = [];
@@ -114,6 +119,7 @@ public partial class MainWindow : Window
     private async void MainWindow_OnLoaded(object sender, RoutedEventArgs eventArgs)
     {
         settings = await settingsStore.LoadAsync();
+        serviceHistory = await serviceHistoryStore.LoadAsync();
         LoadDomainRulesFromSettings();
         var adapters = WindowsAdapterService.GetUsableAdapters();
         AdapterSelector.ItemsSource = adapters;
@@ -126,6 +132,7 @@ public partial class MainWindow : Window
         }
 
         await CheckForUpdatesAsync();
+        RefreshServiceInspector(DateTimeOffset.UtcNow);
     }
 
     private async Task CheckForUpdatesAsync()
@@ -738,6 +745,8 @@ public partial class MainWindow : Window
         try
         {
             await engine.StopAsync();
+            engine.ServiceInspector.CompleteAll(DateTimeOffset.UtcNow);
+            await PersistCompletedServiceSessionsAsync(DateTimeOffset.UtcNow);
             RefreshDevices(null, EventArgs.Empty);
             await SaveSettingsIfDirtyAsync();
             controlStartedAt = null;
@@ -834,6 +843,7 @@ public partial class MainWindow : Window
 
         SyncWebsiteActivityGroups();
         SyncDomainRuleDevices();
+        RefreshServiceInspector(now);
         RefreshDashboardSummary();
         EmptyState.Visibility = Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DeviceCountText.Text = $"{Devices.Count} device{(Devices.Count == 1 ? string.Empty : "s")}";
@@ -959,6 +969,8 @@ public partial class MainWindow : Window
         }
         else
         {
+            engine.ServiceInspector.CompleteAll(DateTimeOffset.UtcNow);
+            _ = PersistCompletedServiceSessionsAsync(DateTimeOffset.UtcNow);
             refreshTimer.Stop();
             controlStartedAt = null;
             UptimeText.Text = "Idle";
@@ -1108,9 +1120,70 @@ public partial class MainWindow : Window
         WebsiteActivitySection.Visibility = target == WebsiteActivitySection
             ? Visibility.Visible
             : Visibility.Collapsed;
+        ServiceInspectorSection.Visibility = target == ServiceInspectorSection
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         DomainRulesSection.Visibility = target == DomainRulesSection
             ? Visibility.Visible
             : Visibility.Collapsed;
+    }
+
+    private void RefreshServiceInspector(DateTimeOffset now)
+    {
+        var expanded = ServiceDeviceGroups
+            .Where(group => group.IsExpanded)
+            .Select(group => group.MacKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var identities = Devices.ToDictionary(
+            device => device.MacKey,
+            device => new ServiceDeviceIdentity(device.DisplayName, device.IpAddress),
+            StringComparer.OrdinalIgnoreCase);
+        var groups = ServiceInspectorPresentationBuilder.Build(
+            engine.ServiceInspector.GetSnapshots(now),
+            identities,
+            serviceHistory,
+            now,
+            expanded);
+        ServiceDeviceGroups.Clear();
+        foreach (var group in groups)
+        {
+            ServiceDeviceGroups.Add(group);
+        }
+
+        ServiceInspectorEmptyState.Visibility = groups.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ServiceInspectorDeviceList.Visibility = groups.Count == 0
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        var serviceCount = groups.Sum(group => group.Services.Count);
+        ServiceInspectorCountText.Text =
+            $"{groups.Count} device{(groups.Count == 1 ? string.Empty : "s")}  •  " +
+            $"{serviceCount} service{(serviceCount == 1 ? string.Empty : "s")}";
+        _ = PersistCompletedServiceSessionsAsync(now);
+    }
+
+    private async Task PersistCompletedServiceSessionsAsync(DateTimeOffset now)
+    {
+        await serviceHistorySaveSync.WaitAsync();
+        try
+        {
+            var completed = engine.ServiceInspector.DrainCompletedSessions(now);
+            if (completed.Count == 0)
+            {
+                return;
+            }
+
+            serviceHistory = await serviceHistoryStore.MergeAndSaveAsync(completed);
+        }
+        catch (Exception exception)
+        {
+            await Dispatcher.InvokeAsync(() => DetailStatusText.Text = exception.Message);
+        }
+        finally
+        {
+            serviceHistorySaveSync.Release();
+        }
     }
 
     private void UpdateAdapterSummary()

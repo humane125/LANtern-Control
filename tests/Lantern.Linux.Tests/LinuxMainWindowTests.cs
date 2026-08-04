@@ -280,19 +280,27 @@ public sealed class LinuxMainWindowTests
     }
 
     [AvaloniaFact]
-    public void Navigation_ShowsVisitedDomainsAndDomainRulesPages()
+    public void Navigation_ShowsVisitedDomainsServiceInspectorAndDomainRulesPages()
     {
         var window = new MainWindow();
         var activityPage = Assert.IsAssignableFrom<Control>(window.FindControl<Control>("ActivityPage"));
         var rulesPage = Assert.IsAssignableFrom<Control>(window.FindControl<Control>("RulesPage"));
+        var servicePage = Assert.IsAssignableFrom<Control>(
+            window.FindControl<Control>("ServiceInspectorPage"));
         var activityButton = Assert.IsType<Button>(
             window.FindControl<Button>("ActivityNavButton"));
         var rulesButton = Assert.IsType<Button>(
             window.FindControl<Button>("RulesNavButton"));
+        var serviceButton = Assert.IsType<Button>(
+            window.FindControl<Button>("ServiceInspectorNavButton"));
 
         activityButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.True(activityPage.IsVisible);
         Assert.False(rulesPage.IsVisible);
+
+        serviceButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.False(activityPage.IsVisible);
+        Assert.True(servicePage.IsVisible);
 
         rulesButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.False(activityPage.IsVisible);
@@ -450,7 +458,7 @@ public sealed class LinuxMainWindowTests
         Assert.Contains("ToggleButton Classes=\"expander-toggle\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"{TemplateBinding Header}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{TemplateBinding IsExpanded}\"", xaml, StringComparison.Ordinal);
-        Assert.Equal(2, CountOccurrences(xaml, "Classes=\"lantern-expander\""));
+        Assert.Equal(3, CountOccurrences(xaml, "Classes=\"lantern-expander\""));
         Assert.Contains("ColumnDefinitions=\"42,1.7*,1.2*,Auto\"", xaml, StringComparison.Ordinal);
     }
 
@@ -489,6 +497,18 @@ public sealed class LinuxMainWindowTests
         Assert.Contains("<Transitions />", xaml, StringComparison.Ordinal);
         Assert.Contains("Grid x:Name=\"ActivityPage\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Grid x:Name=\"RulesPage\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Grid x:Name=\"ServiceInspectorPage\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ServiceInspectorNavButton\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding ServiceDeviceGroups}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HTTPS content stays encrypted", xaml, StringComparison.Ordinal);
+        Assert.Contains("grouped as Other", xaml, StringComparison.Ordinal);
+        var overviewNavIndex = xaml.IndexOf("x:Name=\"OverviewNavButton\"", StringComparison.Ordinal);
+        var activityNavIndex = xaml.IndexOf("x:Name=\"ActivityNavButton\"", StringComparison.Ordinal);
+        var serviceNavIndex = xaml.IndexOf("x:Name=\"ServiceInspectorNavButton\"", StringComparison.Ordinal);
+        var rulesNavIndex = xaml.IndexOf("x:Name=\"RulesNavButton\"", StringComparison.Ordinal);
+        Assert.True(overviewNavIndex < activityNavIndex);
+        Assert.True(activityNavIndex < serviceNavIndex);
+        Assert.True(serviceNavIndex < rulesNavIndex);
         Assert.Contains("Grid x:Name=\"ActivityList\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer Grid.Row=\"1\" Classes=\"domain-scroll\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Style Selector=\"ScrollViewer.domain-scroll\"", xaml, StringComparison.Ordinal);

@@ -423,6 +423,10 @@
                                                              Value="Visible">
                                                     <Setter Property="Fill" Value="{StaticResource SecondaryText}" />
                                                 </DataTrigger>
+                                                <DataTrigger Binding="{Binding Visibility, ElementName=ServiceInspectorSection}"
+                                                             Value="Visible">
+                                                    <Setter Property="Fill" Value="{StaticResource SecondaryText}" />
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Path.Style>
@@ -460,6 +464,37 @@
                                 </Path>
                             </Grid>
                             <TextBlock Text="Visited domains" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ServiceInspectorNavButton"
+                            Style="{StaticResource NavButtonStyle}"
+                            Tag="ServiceInspectorSection"
+                            Click="NavigationButton_OnClick">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="25" Height="20">
+                                <Path Width="17"
+                                      Height="17"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Data="M2,4 H18 M2,10 H18 M2,16 H18 M5,2 V6 M10,8 V12 M15,14 V18"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Stretch="Uniform">
+                                    <Path.Style>
+                                        <Style TargetType="Path">
+                                            <Setter Property="Stroke" Value="{StaticResource SecondaryText}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Visibility, ElementName=ServiceInspectorSection}"
+                                                             Value="Visible">
+                                                    <Setter Property="Stroke" Value="{StaticResource Accent}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+                            </Grid>
+                            <TextBlock Text="Service Inspector" />
                         </StackPanel>
                     </Button>
                     <Button x:Name="DomainRulesNavButton"
@@ -1169,6 +1204,155 @@
                                 BorderBrush="{StaticResource Border}"
                                 BorderThickness="0,1,0,0">
                             <TextBlock Text="Domain metadata only  •  HTTPS pages, passwords, searches, and messages remain encrypted"
+                                       Foreground="{StaticResource SecondaryText}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border x:Name="ServiceInspectorSection"
+                        Margin="12,0,12,18"
+                        Style="{StaticResource CardBorderStyle}"
+                        ClipToBounds="True"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="20,18,20,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="TRAFFIC CLASSIFICATION"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="10"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="Service Inspector"
+                                           FontSize="24"
+                                           FontWeight="Bold" />
+                                <TextBlock Margin="0,5,0,0"
+                                           Text="See which services each device is using and how much traffic each session consumes."
+                                           Foreground="{StaticResource SecondaryText}"
+                                           FontSize="12" />
+                            </StackPanel>
+                            <TextBlock x:Name="ServiceInspectorCountText"
+                                       Grid.Column="1"
+                                       Text="0 devices  •  0 services"
+                                       Foreground="{StaticResource SecondaryText}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <Border Grid.Row="1"
+                                Background="{StaticResource Border}"
+                                Height="1" />
+                        <Grid Grid.Row="2" MinHeight="360" Margin="16,10,16,16">
+                            <StackPanel x:Name="ServiceInspectorEmptyState"
+                                        Margin="32"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="No service activity yet"
+                                           HorizontalAlignment="Center"
+                                           FontSize="15"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Margin="0,5,0,0"
+                                           Text="Start control and use a connected device. Recognized services will appear here."
+                                           Foreground="{StaticResource SecondaryText}"
+                                           TextAlignment="Center" />
+                            </StackPanel>
+                            <ItemsControl x:Name="ServiceInspectorDeviceList"
+                                          ItemsSource="{Binding ServiceDeviceGroups}"
+                                          Visibility="Collapsed">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,10"
+                                                Background="{StaticResource InputBackground}"
+                                                BorderBrush="{StaticResource Border}"
+                                                BorderThickness="1"
+                                                CornerRadius="9">
+                                            <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                                                <Expander.Header>
+                                                    <Grid Margin="14,11,16,11">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding DeviceName}" FontWeight="SemiBold" />
+                                                            <TextBlock Text="{Binding IpAddress}" Foreground="{StaticResource SecondaryText}" FontSize="10" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" Margin="20,0" Text="{Binding ServiceCountText}" Foreground="{StaticResource Accent}" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding LastActivityText}" Foreground="{StaticResource SecondaryText}" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Expander.Header>
+                                                <ItemsControl Margin="12,0,12,12" ItemsSource="{Binding Services}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Padding="15,12"
+                                                                    Background="{StaticResource WindowBackground}"
+                                                                    BorderBrush="{StaticResource Border}"
+                                                                    BorderThickness="1,0,1,1">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="1.45*" />
+                                                                        <ColumnDefinition Width="1.1*" />
+                                                                        <ColumnDefinition Width="1.1*" />
+                                                                        <ColumnDefinition Width="1.1*" />
+                                                                        <ColumnDefinition Width=".85*" />
+                                                                        <ColumnDefinition Width="1.05*" />
+                                                                        <ColumnDefinition Width="1.05*" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding ServiceName}" FontWeight="SemiBold" />
+                                                                        <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource Accent}" FontSize="10" />
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="1">
+                                                                        <TextBlock Text="CURRENT" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding DownloadRateText}"/><Run Text="  ↑ "/><Run Text="{Binding UploadRateText}"/></TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="2">
+                                                                        <TextBlock Text="SESSION DATA" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding SessionDownloadText}"/><Run Text="  ↑ "/><Run Text="{Binding SessionUploadText}"/></TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="3">
+                                                                        <TextBlock Text="TODAY" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding TodayDownloadText}"/><Run Text="  ↑ "/><Run Text="{Binding TodayUploadText}"/></TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="4">
+                                                                        <TextBlock Text="DURATION" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBlock Margin="0,4,0,0" Text="{Binding DurationText}" />
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="5">
+                                                                        <TextBlock Text="CONNECTIONS" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBlock Margin="0,4,0,0" Text="{Binding ConnectionCountText}" />
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="6">
+                                                                        <TextBlock Text="ACTIVITY" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="{Binding FirstSeenText}"/><Run Text=" → "/><Run Text="{Binding LastActivityText}"/></TextBlock>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Expander>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                        <Border Grid.Row="3"
+                                Padding="20,11"
+                                Background="{StaticResource InputBackground}"
+                                BorderBrush="{StaticResource Border}"
+                                BorderThickness="0,1,0,0">
+                            <TextBlock Text="Metadata classification only  •  HTTPS content stays encrypted  •  Unknown or encrypted traffic is grouped as Other"
                                        Foreground="{StaticResource SecondaryText}"
                                        FontSize="11"
                                        TextWrapping="Wrap" />

@@ -81,7 +81,7 @@ public static class ServiceInspectorPresentationBuilder
             FormatBytes(currentUpload),
             FormatBytes(todayDownload),
             FormatBytes(todayUpload),
-            FormatDuration(snapshot?.ActiveDuration ?? TimeSpan.Zero),
+            FormatDuration(snapshot?.ActiveDuration ?? history?.ActiveDuration ?? TimeSpan.Zero),
             FormatConnections(snapshot?.ActiveConnections ?? 0),
             snapshot is null ? "-" : snapshot.FirstSeen.ToLocalTime().ToString("HH:mm:ss"),
             lastActivity?.ToLocalTime().ToString("HH:mm:ss") ?? "-",

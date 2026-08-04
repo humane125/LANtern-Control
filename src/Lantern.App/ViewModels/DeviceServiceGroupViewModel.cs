@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
 
 namespace Lantern.App.ViewModels;
 
@@ -47,7 +46,4 @@ public sealed class DeviceServiceGroupViewModel(
     public string LastActivityText => Services.Count == 0
         ? "Waiting for activity"
         : $"Last activity {Services.Max(service => service.LastActivityText)}";
-
-    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

@@ -98,6 +98,7 @@ public sealed class DeviceViewModelTests
                         "BrandLogo",
                         "OverviewNavButton",
                         "ActivityNavButton",
+                        "ServiceInspectorNavButton",
                         "DomainRulesNavButton",
                         "AdapterStrip",
                         "MetricsPanel",
@@ -107,6 +108,9 @@ public sealed class DeviceViewModelTests
                         "ActiveRulesMetric",
                         "ActivitySection",
                         "WebsiteActivitySection",
+                        "ServiceInspectorSection",
+                        "ServiceInspectorDeviceList",
+                        "ServiceInspectorEmptyState",
                         "WebsiteActivityDeviceList",
                         "ClearActivityButton",
                         "DomainRulesSection",
@@ -190,14 +194,23 @@ public sealed class DeviceViewModelTests
                         window.FindName("WebsiteActivitySection"));
                     var domainRulesSection = Assert.IsType<Border>(
                         window.FindName("DomainRulesSection"));
+                    var serviceInspectorSection = Assert.IsType<Border>(
+                        window.FindName("ServiceInspectorSection"));
                     Assert.Equal(Visibility.Visible, overviewSection.Visibility);
                     Assert.Equal(Visibility.Collapsed, websiteSection.Visibility);
+                    Assert.Equal(Visibility.Collapsed, serviceInspectorSection.Visibility);
                     Assert.Equal(Visibility.Collapsed, domainRulesSection.Visibility);
 
                     var activityNav = Assert.IsType<Button>(window.FindName("ActivityNavButton"));
                     activityNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Assert.Equal(Visibility.Collapsed, overviewSection.Visibility);
                     Assert.Equal(Visibility.Visible, websiteSection.Visibility);
+
+                    var serviceInspectorNav = Assert.IsType<Button>(
+                        window.FindName("ServiceInspectorNavButton"));
+                    serviceInspectorNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert.Equal(Visibility.Collapsed, websiteSection.Visibility);
+                    Assert.Equal(Visibility.Visible, serviceInspectorSection.Visibility);
 
                     var overviewNav = Assert.IsType<Button>(window.FindName("OverviewNavButton"));
                     overviewNav.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -280,6 +293,15 @@ public sealed class DeviceViewModelTests
                     Assert.Contains("Text=\"{Binding PresetName}\"", xaml, StringComparison.Ordinal);
                     Assert.Contains("ItemsSource=\"{Binding Domains}\"", xaml, StringComparison.Ordinal);
                     Assert.Contains("IsExpanded=\"{Binding IsExpanded, Mode=TwoWay}\"", xaml, StringComparison.Ordinal);
+                    Assert.Contains("HTTPS content stays encrypted", xaml, StringComparison.Ordinal);
+                    Assert.Contains("grouped as Other", xaml, StringComparison.Ordinal);
+                    var overviewNavIndex = xaml.IndexOf("x:Name=\"OverviewNavButton\"", StringComparison.Ordinal);
+                    var activityNavIndex = xaml.IndexOf("x:Name=\"ActivityNavButton\"", StringComparison.Ordinal);
+                    var serviceNavIndex = xaml.IndexOf("x:Name=\"ServiceInspectorNavButton\"", StringComparison.Ordinal);
+                    var rulesNavIndex = xaml.IndexOf("x:Name=\"DomainRulesNavButton\"", StringComparison.Ordinal);
+                    Assert.True(overviewNavIndex < activityNavIndex);
+                    Assert.True(activityNavIndex < serviceNavIndex);
+                    Assert.True(serviceNavIndex < rulesNavIndex);
                     chart.Measure(new System.Windows.Size(800, 238));
                     chart.Arrange(new System.Windows.Rect(0, 0, 800, 238));
                     var emptyChartBitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(

@@ -96,4 +96,41 @@ public sealed class ServiceInspectorPresentationTests
         Assert.Equal("-", group.IpAddress);
         Assert.False(group.IsExpanded);
     }
+
+    [Fact]
+    public void Build_HistoryOnlyServiceShowsPersistedDuration()
+    {
+        var now = DateTimeOffset.Parse("2026-08-04T12:00:00Z");
+        var history = new ServiceUsageHistory
+        {
+            Days =
+            [
+                new ServiceUsageDay
+                {
+                    Date = DateOnly.FromDateTime(now.LocalDateTime),
+                    Services =
+                    [
+                        new ServiceUsageAggregate
+                        {
+                            MacKey = "E261190DBD54",
+                            ServiceId = "spotify",
+                            ServiceName = "Spotify",
+                            ActiveDuration = TimeSpan.FromMinutes(42),
+                            LastActivity = now.AddMinutes(-2),
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var service = Assert.Single(Assert.Single(ServiceInspectorPresentationBuilder.Build(
+            [],
+            new Dictionary<string, ServiceDeviceIdentity>(),
+            history,
+            now,
+            new HashSet<string>())).Services);
+
+        Assert.Equal("42m 00s", service.DurationText);
+        Assert.Equal("Idle", service.StatusText);
+    }
 }
