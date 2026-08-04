@@ -22,6 +22,14 @@ public readonly record struct TransportFlow(
     ushort DestinationPort,
     byte Protocol);
 
+internal readonly record struct DnsResolvedAddress(
+    IPAddress Address,
+    TimeSpan Lifetime);
+
+internal readonly record struct DnsResolution(
+    string Domain,
+    IReadOnlyList<DnsResolvedAddress> Addresses);
+
 public static class NetworkActivityParser
 {
     private const ushort EtherTypeIpv4 = 0x0800;
@@ -105,6 +113,91 @@ public static class NetworkActivityParser
             destinationAddress,
             destinationPort,
             protocol);
+        return true;
+    }
+
+    internal static bool TryParseDnsResponse(
+        ReadOnlySpan<byte> frame,
+        out DnsResolution resolution)
+    {
+        resolution = default;
+        if (!TryGetTransportPayload(
+                frame,
+                out var protocol,
+                out var sourcePort,
+                out _,
+                out _,
+                out _,
+                out var payload) ||
+            sourcePort != 53)
+        {
+            return false;
+        }
+
+        if (protocol == 6)
+        {
+            if (payload.Length < 2)
+            {
+                return false;
+            }
+
+            var messageLength = ReadUInt16(payload, 0);
+            payload = payload[2..];
+            if (messageLength > payload.Length)
+            {
+                return false;
+            }
+
+            payload = payload[..messageLength];
+        }
+
+        if (payload.Length < 12 ||
+            (ReadUInt16(payload, 2) & 0x8000) == 0 ||
+            ReadUInt16(payload, 4) == 0 ||
+            ReadUInt16(payload, 6) == 0 ||
+            !TryReadDnsName(payload, 12, out var domain, out var offset) ||
+            offset + 4 > payload.Length ||
+            !TryNormalizeDomain(domain, out var normalizedDomain))
+        {
+            return false;
+        }
+
+        offset += 4;
+        var answerCount = ReadUInt16(payload, 6);
+        var addresses = new List<DnsResolvedAddress>(answerCount);
+        for (var index = 0; index < answerCount; index++)
+        {
+            if (!TrySkipDnsName(payload, offset, out offset) || offset + 10 > payload.Length)
+            {
+                return false;
+            }
+
+            var type = ReadUInt16(payload, offset);
+            var dnsClass = ReadUInt16(payload, offset + 2);
+            var ttlSeconds = ReadUInt32(payload, offset + 4);
+            var dataLength = ReadUInt16(payload, offset + 8);
+            offset += 10;
+            if (offset + dataLength > payload.Length)
+            {
+                return false;
+            }
+
+            if (type == 1 && dnsClass == 1 && dataLength == 4)
+            {
+                addresses.Add(new DnsResolvedAddress(
+                    new IPAddress(payload.Slice(offset, 4)),
+                    TimeSpan.FromSeconds(Math.Clamp(ttlSeconds, 1u, 3600u))));
+            }
+
+            offset += dataLength;
+        }
+
+        if (addresses.Count == 0)
+        {
+            return false;
+        }
+
+        resolution = new DnsResolution(normalizedDomain, addresses);
         return true;
     }
 
@@ -237,8 +330,16 @@ public static class NetworkActivityParser
         ReadOnlySpan<byte> message,
         int offset,
         out string? domain)
+        => TryReadDnsName(message, offset, out domain, out _);
+
+    private static bool TryReadDnsName(
+        ReadOnlySpan<byte> message,
+        int offset,
+        out string? domain,
+        out int nextOffset)
     {
         domain = null;
+        nextOffset = offset;
         var labels = new List<string>();
         var totalLength = 0;
         while (offset < message.Length)
@@ -247,6 +348,7 @@ public static class NetworkActivityParser
             if (labelLength == 0)
             {
                 domain = string.Join('.', labels);
+                nextOffset = offset;
                 return labels.Count > 0;
             }
 
@@ -261,6 +363,45 @@ public static class NetworkActivityParser
             labels.Add(Encoding.ASCII.GetString(message.Slice(offset, labelLength)));
             offset += labelLength;
             totalLength += labelLength + 1;
+        }
+
+        return false;
+    }
+
+    private static bool TrySkipDnsName(
+        ReadOnlySpan<byte> message,
+        int offset,
+        out int nextOffset)
+    {
+        nextOffset = offset;
+        while (offset < message.Length)
+        {
+            var labelLength = message[offset++];
+            if (labelLength == 0)
+            {
+                nextOffset = offset;
+                return true;
+            }
+
+            if ((labelLength & 0xc0) == 0xc0)
+            {
+                if (offset >= message.Length)
+                {
+                    return false;
+                }
+
+                nextOffset = offset + 1;
+                return true;
+            }
+
+            if ((labelLength & 0xc0) != 0 ||
+                labelLength > 63 ||
+                offset + labelLength > message.Length)
+            {
+                return false;
+            }
+
+            offset += labelLength;
         }
 
         return false;
@@ -488,4 +629,10 @@ public static class NetworkActivityParser
 
     private static int ReadUInt24(ReadOnlySpan<byte> bytes, int offset) =>
         (bytes[offset] << 16) | (bytes[offset + 1] << 8) | bytes[offset + 2];
+
+    private static uint ReadUInt32(ReadOnlySpan<byte> bytes, int offset) =>
+        ((uint)bytes[offset] << 24) |
+        ((uint)bytes[offset + 1] << 16) |
+        ((uint)bytes[offset + 2] << 8) |
+        bytes[offset + 3];
 }

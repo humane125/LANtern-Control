@@ -33,6 +33,7 @@ public readonly record struct ServiceFlowKey(
 public sealed class FrameRouter
 {
     private const int MaxObservedFlows = 8192;
+    private const int MaxResolvedAddresses = 8192;
     private readonly PhysicalAddress localMac;
     private readonly IPAddress localIp;
     private readonly PhysicalAddress gatewayMac;
@@ -40,6 +41,7 @@ public sealed class FrameRouter
     private readonly bool enforceRateLimits;
     private readonly ConcurrentDictionary<IPAddress, PhysicalAddress> clients;
     private readonly ConcurrentDictionary<ServiceFlowKey, string> observedFlowDomains = [];
+    private readonly ConcurrentDictionary<ResolvedAddressKey, ResolvedDomain> resolvedDomains = [];
 
     public FrameRouter(
         PhysicalAddress localMac,
@@ -116,6 +118,7 @@ public sealed class FrameRouter
             ipv4.SourceMac.Equals(gatewayMac) &&
             clients.TryGetValue(ipv4.Destination, out var downloadClientMac))
         {
+            RememberDnsResolution(frame, downloadClientMac);
             return RouteForClient(
                 frame,
                 downloadClientMac,
@@ -153,6 +156,37 @@ public sealed class FrameRouter
 
             observedFlowDomains[observedKey] = observedDomain.Domain;
             attributedDomain = observedDomain.Domain;
+        }
+
+        if (attributedDomain is null &&
+            flowKey is { } rememberedFlow &&
+            observedFlowDomains.TryGetValue(rememberedFlow, out var rememberedFlowDomain))
+        {
+            attributedDomain = rememberedFlowDomain;
+        }
+
+        if (attributedDomain is null && flowKey is { } resolvedFlow)
+        {
+            var resolvedKey = new ResolvedAddressKey(
+                resolvedFlow.ClientMac,
+                resolvedFlow.RemoteAddress);
+            if (resolvedDomains.TryGetValue(resolvedKey, out var resolved))
+            {
+                if (resolved.ExpiresAt > DateTimeOffset.UtcNow)
+                {
+                    if (observedFlowDomains.Count >= MaxObservedFlows)
+                    {
+                        observedFlowDomains.Clear();
+                    }
+
+                    observedFlowDomains[resolvedFlow] = resolved.Domain;
+                    attributedDomain = resolved.Domain;
+                }
+                else
+                {
+                    resolvedDomains.TryRemove(resolvedKey, out _);
+                }
+            }
         }
 
         if (flowKey is { } knownKey &&
@@ -248,4 +282,37 @@ public sealed class FrameRouter
                 flow.SourceAddress,
                 flow.SourcePort,
                 flow.Protocol);
+
+    private void RememberDnsResolution(
+        ReadOnlySpan<byte> frame,
+        PhysicalAddress clientMac)
+    {
+        if (!NetworkActivityParser.TryParseDnsResponse(frame, out var resolution))
+        {
+            return;
+        }
+
+        if (resolvedDomains.Count >= MaxResolvedAddresses)
+        {
+            resolvedDomains.Clear();
+        }
+
+        var macKey = TrafficPolicy.NormalizeMac(clientMac.ToString());
+        var now = DateTimeOffset.UtcNow;
+        foreach (var resolvedAddress in resolution.Addresses)
+        {
+            resolvedDomains[new ResolvedAddressKey(macKey, resolvedAddress.Address)] =
+                new ResolvedDomain(
+                    resolution.Domain,
+                    now + resolvedAddress.Lifetime);
+        }
+    }
+
+    private readonly record struct ResolvedAddressKey(
+        string ClientMac,
+        IPAddress Address);
+
+    private readonly record struct ResolvedDomain(
+        string Domain,
+        DateTimeOffset ExpiresAt);
 }

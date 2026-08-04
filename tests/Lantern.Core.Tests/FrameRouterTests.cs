@@ -227,6 +227,63 @@ public sealed class FrameRouterTests
         Assert.Null(result.Flow);
     }
 
+    [Theory]
+    [InlineData("rr1.googlevideo.com", "youtube")]
+    [InlineData("video.xx.fbcdn.net", "facebook")]
+    [InlineData("i.cdninstagram.com", "instagram")]
+    public void Route_DnsAnswerAttributesLaterQuicFlowToResolvedServiceDomain(
+        string domain,
+        string expectedService)
+    {
+        var router = CreateRouter();
+        var serviceAddress = IPAddress.Parse("142.250.186.110");
+
+        _ = router.Route(BuildDnsResponseFrame(domain, serviceAddress));
+        var result = router.Route(BuildUdpPayloadFrame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            serviceAddress,
+            53000,
+            443,
+            [0xc0, 0x00, 0x00, 0x00]));
+
+        Assert.Equal(FrameAction.Forward, result.Action);
+        Assert.Equal(domain, result.AttributedDomain);
+        Assert.Equal(
+            expectedService,
+            Lantern.Core.Services.ServiceDefinitionCatalog.MatchDomain(result.AttributedDomain).Id);
+        Assert.NotNull(result.Flow);
+    }
+
+    [Fact]
+    public void Route_ExplicitTlsHostnameTakesPriorityOverResolvedAddressCache()
+    {
+        var router = CreateRouter();
+        var sharedAddress = IPAddress.Parse("157.240.0.35");
+        const ushort clientPort = 53000;
+
+        _ = router.Route(BuildDnsResponseFrame("video.xx.fbcdn.net", sharedAddress));
+        _ = router.Route(BuildTcpPayloadFrame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            sharedAddress,
+            clientPort,
+            443,
+            BuildTlsClientHello("www.youtube.com")));
+        var result = router.Route(BuildTcpPayloadFrame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            sharedAddress,
+            clientPort,
+            443,
+            [0x17, 0x03, 0x03, 0x00, 0x20]));
+
+        Assert.Equal("www.youtube.com", result.AttributedDomain);
+    }
+
     [Fact]
     public void Route_LocalComputerTrafficIsIgnored()
     {
@@ -356,17 +413,69 @@ public sealed class FrameRouterTests
 
     private static byte[] BuildUdpIpv4Frame(ushort destinationPort, byte[] payload)
     {
-        const int udpHeaderBytes = 8;
-        var frame = BuildIpv4Frame(
+        return BuildUdpPayloadFrame(
             LocalMac,
             ClientMac,
             ClientIp,
             IPAddress.Parse("1.1.1.1"),
+            0xcf08,
+            destinationPort,
+            payload);
+    }
+
+    private static byte[] BuildDnsResponseFrame(string domain, IPAddress resolvedAddress)
+    {
+        var response = new List<byte>
+        {
+            0x12, 0x34, 0x81, 0x80, 0x00, 0x01,
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+        };
+        foreach (var label in domain.Split('.'))
+        {
+            response.Add((byte)label.Length);
+            response.AddRange(Encoding.ASCII.GetBytes(label));
+        }
+
+        response.Add(0);
+        response.AddRange([0, 1, 0, 1]);
+        response.AddRange([
+            0xc0, 0x0c,
+            0x00, 0x01,
+            0x00, 0x01,
+            0x00, 0x00, 0x00, 0x3c,
+            0x00, 0x04,
+        ]);
+        response.AddRange(resolvedAddress.GetAddressBytes());
+        return BuildUdpPayloadFrame(
+            LocalMac,
+            GatewayMac,
+            IPAddress.Parse("1.1.1.1"),
+            ClientIp,
+            53,
+            0xcf08,
+            [.. response]);
+    }
+
+    private static byte[] BuildUdpPayloadFrame(
+        PhysicalAddress destinationMac,
+        PhysicalAddress sourceMac,
+        IPAddress sourceIp,
+        IPAddress destinationIp,
+        ushort sourcePort,
+        ushort destinationPort,
+        byte[] payload)
+    {
+        const int udpHeaderBytes = 8;
+        var frame = BuildIpv4Frame(
+            destinationMac,
+            sourceMac,
+            sourceIp,
+            destinationIp,
             udpHeaderBytes + payload.Length);
         frame[23] = 17;
         var udpOffset = 14 + 20;
-        frame[udpOffset] = 0xcf;
-        frame[udpOffset + 1] = 0x08;
+        frame[udpOffset] = (byte)(sourcePort >> 8);
+        frame[udpOffset + 1] = (byte)sourcePort;
         frame[udpOffset + 2] = (byte)(destinationPort >> 8);
         frame[udpOffset + 3] = (byte)destinationPort;
         var udpLength = udpHeaderBytes + payload.Length;
