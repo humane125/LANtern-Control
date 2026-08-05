@@ -22,13 +22,18 @@ public sealed class ServiceInspectorTracker
             return;
         }
 
+        Observe(ServiceInspectorObservation.FromRouteResult(result), observedAt);
+    }
+
+    public void Observe(ServiceInspectorObservation result, DateTimeOffset observedAt)
+    {
         var macKey = result.Flow?.ClientMac ??
                      TrafficPolicy.NormalizeMac(result.ClientMac.ToString());
         lock (sync)
         {
             ExpireIfDue(observedAt);
 
-            if (result.Observation is { } observation)
+            if (result.DomainObservation is { } observation)
             {
                 var observedService = ResolveService(
                     macKey,

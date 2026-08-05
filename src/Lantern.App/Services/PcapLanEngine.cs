@@ -34,6 +34,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private AdapterProfile? profile;
     private PhysicalAddress? gatewayMac;
     private FrameRouter? frameRouter;
+    private ServiceInspectorObservationPump? serviceInspectorPump;
     private TaskCompletionSource<PhysicalAddress>? gatewayResolution;
     private ConcurrentDictionary<IPAddress, PhysicalAddress>? activeProbeReplies;
     private ConcurrentDictionary<string, IPAddress>? activeKnownDeviceReplies;
@@ -154,6 +155,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 gatewayMac,
                 clients,
                 policy);
+            serviceInspectorPump = new ServiceInspectorObservationPump(
+                ServiceInspector.Observe);
 
             RaiseStatus("Loading devices already observed by Windows…");
             engineCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -440,6 +443,12 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 forwardingDevice = null;
             }
 
+            if (serviceInspectorPump is not null)
+            {
+                await serviceInspectorPump.DisposeAsync();
+                serviceInspectorPump = null;
+            }
+
             engineCancellation?.Dispose();
             engineCancellation = null;
             backgroundTask = null;
@@ -637,14 +646,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
         var result = frameRouter.Route(bytes);
         var observedAt = DateTimeOffset.UtcNow;
-        try
-        {
-            ServiceInspector.Observe(result, observedAt);
-        }
-        catch (Exception)
-        {
-            // Usage accounting is optional telemetry. It must never interrupt forwarding.
-        }
+        serviceInspectorPump?.TryObserve(result, observedAt);
         if (result.Direction is not null && result.ClientMac is not null)
         {
             registry.RecordTraffic(

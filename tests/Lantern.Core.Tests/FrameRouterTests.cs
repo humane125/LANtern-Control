@@ -184,7 +184,12 @@ public sealed class FrameRouterTests
     [Fact]
     public void Route_ReusesTlsHostnameAndCanonicalKeyForReverseDownloadFlow()
     {
-        var router = CreateRouter();
+        var policy = new TrafficPolicy();
+        policy.SetServiceRule(
+            ClientMac.ToString(),
+            "youtube",
+            new ServiceTrafficRule(1_000, 0));
+        var router = CreateRouter(policy);
         var remoteIp = IPAddress.Parse("142.250.186.110");
         const ushort clientPort = 51000;
         var clientHello = BuildTcpPayloadFrame(
@@ -215,6 +220,25 @@ public sealed class FrameRouterTests
         Assert.Equal(uploadResult.Flow, downloadResult.Flow);
         Assert.Equal(clientPort, downloadResult.Flow!.Value.ClientPort);
         Assert.Equal(remoteIp, downloadResult.Flow.Value.RemoteAddress);
+    }
+
+    [Fact]
+    public void Route_LeavesServiceClassificationToInspectorWhenNoServiceLimitExists()
+    {
+        var router = CreateRouter();
+        var clientHello = BuildTcpPayloadFrame(
+            LocalMac,
+            ClientMac,
+            ClientIp,
+            IPAddress.Parse("142.250.186.110"),
+            51_000,
+            443,
+            BuildTlsClientHello("www.youtube.com"));
+
+        var result = router.Route(clientHello);
+
+        Assert.Equal("www.youtube.com", result.AttributedDomain);
+        Assert.Null(result.ServiceId);
     }
 
     [Fact]

@@ -51,10 +51,17 @@ public static class ServiceDefinitionCatalog
         }
 
         return All.FirstOrDefault(service => service.Domains.Any(candidate =>
-                   normalized.Equals(candidate, StringComparison.OrdinalIgnoreCase) ||
-                   normalized.EndsWith($".{candidate}", StringComparison.OrdinalIgnoreCase))) ??
+                   MatchesDomain(normalized, candidate))) ??
                Other;
     }
+
+    private static bool MatchesDomain(string normalized, string candidate) =>
+        normalized.Equals(candidate, StringComparison.OrdinalIgnoreCase) ||
+        (normalized.Length > candidate.Length &&
+         normalized[normalized.Length - candidate.Length - 1] == '.' &&
+         normalized.AsSpan().EndsWith(
+             candidate.AsSpan(),
+             StringComparison.OrdinalIgnoreCase));
 
     private static ServiceDefinition Define(string id, string name, params string[] domains) =>
         new(id, name, domains);

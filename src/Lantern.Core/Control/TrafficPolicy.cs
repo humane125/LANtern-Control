@@ -72,6 +72,8 @@ public sealed class TrafficPolicy
 
     public bool SafeModeEnabled => Volatile.Read(ref safeModeEnabled) != 0;
 
+    public bool HasAnyServiceRules => !serviceRules.IsEmpty;
+
     public void SetSafeMode(bool enabled) =>
         Volatile.Write(ref safeModeEnabled, enabled ? 1 : 0);
 

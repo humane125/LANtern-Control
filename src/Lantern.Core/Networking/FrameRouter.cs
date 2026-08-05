@@ -239,7 +239,10 @@ public sealed class FrameRouter
                     : outbound.Domain);
         }
 
-        var serviceId = string.IsNullOrWhiteSpace(attributedDomain)
+        // Service Inspector classifies attributed domains on its background worker.
+        // The forwarding thread only needs a service ID when a service-specific
+        // limiter is configured; otherwise catalog scans add latency to every packet.
+        var serviceId = !policy.HasAnyServiceRules || string.IsNullOrWhiteSpace(attributedDomain)
             ? null
             : ServiceDefinitionCatalog.MatchDomain(attributedDomain).Id;
         var shouldForward = enforceRateLimits

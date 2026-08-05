@@ -37,6 +37,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
     private AdapterProfile? profile;
     private PhysicalAddress? gatewayMac;
     private FrameRouter? frameRouter;
+    private ServiceInspectorObservationPump? serviceInspectorPump;
     private LinuxFramePacer? framePacer;
     private LinuxOffloadSession? offloadSession;
     private LinuxIpForwardingSession? ipForwardingSession;
@@ -176,6 +177,8 @@ public sealed class LinuxLanEngine : IAsyncDisposable
                 clients,
                 policy,
                 enforceRateLimits: false);
+            serviceInspectorPump = new ServiceInspectorObservationPump(
+                ServiceInspector.Observe);
             framePacer = new LinuxFramePacer(
                 policy,
                 frame =>
@@ -392,6 +395,12 @@ public sealed class LinuxLanEngine : IAsyncDisposable
             {
                 await framePacer.DisposeAsync();
                 framePacer = null;
+            }
+
+            if (serviceInspectorPump is not null)
+            {
+                await serviceInspectorPump.DisposeAsync();
+                serviceInspectorPump = null;
             }
 
             try
@@ -737,14 +746,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
 
         var result = frameRouter.Route(bytes);
         var observedAt = DateTimeOffset.UtcNow;
-        try
-        {
-            ServiceInspector.Observe(result, observedAt);
-        }
-        catch (Exception)
-        {
-            // Usage accounting is optional telemetry. It must never interrupt forwarding.
-        }
+        serviceInspectorPump?.TryObserve(result, observedAt);
         if (result.Direction is { } direction && result.ClientMac is { } clientMac)
         {
             registry.RecordTraffic(clientMac, direction, result.MeteredByteCount);
