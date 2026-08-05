@@ -189,6 +189,47 @@ public sealed class TrafficControlTests
         Assert.Equal(InterceptionTargets.None, policy.GetInterceptionTargets(mac));
     }
 
+    [Fact]
+    public void TrafficPolicy_ServiceLimitOperatesInsideHardDeviceCeiling()
+    {
+        const string mac = "00:11:22:33:44:01";
+        var clock = new ManualClock();
+        var policy = new TrafficPolicy(clock.Read);
+        policy.SetRule(mac, new TrafficRule(false, 2, 0));
+        policy.SetServiceRule(mac, "youtube", new ServiceTrafficRule(1, 0));
+
+        Assert.True(policy.ShouldForward(
+            mac, "youtube", TrafficDirection.Download, 1_500));
+        Assert.True(policy.ShouldForward(
+            mac, "spotify", TrafficDirection.Download, 1_500));
+        Assert.False(policy.ShouldForward(
+            mac, "spotify", TrafficDirection.Download, 1));
+
+        clock.Seconds = 1;
+
+        Assert.True(policy.ShouldForward(
+            mac, "youtube", TrafficDirection.Download, 1_000));
+        Assert.True(policy.ShouldForward(
+            mac, "spotify", TrafficDirection.Download, 1_000));
+        Assert.False(policy.ShouldForward(
+            mac, "spotify", TrafficDirection.Download, 1));
+    }
+
+    [Fact]
+    public void TrafficPolicy_RejectedChildDoesNotConsumeParentCapacity()
+    {
+        const string mac = "00:11:22:33:44:01";
+        var policy = new TrafficPolicy(() => 0);
+        policy.SetRule(mac, new TrafficRule(false, 2, 0));
+        policy.SetServiceRule(mac, "youtube", new ServiceTrafficRule(1, 0));
+
+        Assert.False(policy.ShouldForward(
+            mac, "youtube", TrafficDirection.Download, 1_501));
+
+        Assert.True(policy.ShouldForward(
+            mac, "spotify", TrafficDirection.Download, 3_000));
+    }
+
     [Theory]
     [InlineData(false, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
     [InlineData(true, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]

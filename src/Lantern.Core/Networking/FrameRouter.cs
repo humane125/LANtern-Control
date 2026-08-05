@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.NetworkInformation;
 using Lantern.Core.Control;
+using Lantern.Core.Services;
 
 namespace Lantern.Core.Networking;
 
@@ -21,7 +22,8 @@ public sealed record FrameRouteResult(
     DomainObservation? Observation = null,
     bool BlockedByDomain = false,
     ServiceFlowKey? Flow = null,
-    string? AttributedDomain = null);
+    string? AttributedDomain = null,
+    string? ServiceId = null);
 
 public readonly record struct ServiceFlowKey(
     string ClientMac,
@@ -237,8 +239,15 @@ public sealed class FrameRouter
                     : outbound.Domain);
         }
 
+        var serviceId = string.IsNullOrWhiteSpace(attributedDomain)
+            ? null
+            : ServiceDefinitionCatalog.MatchDomain(attributedDomain).Id;
         var shouldForward = enforceRateLimits
-            ? policy.ShouldForward(clientMac.ToString(), direction, frame.Length)
+            ? policy.ShouldForward(
+                clientMac.ToString(),
+                serviceId,
+                direction,
+                frame.Length)
             : !policy.GetRule(clientMac.ToString()).PauseInternet;
         if (!shouldForward)
         {
@@ -248,7 +257,8 @@ public sealed class FrameRouter
                 clientMac,
                 Observation: observation,
                 Flow: observation is { Source: DomainObservationSource.Dns } ? null : flowKey,
-                AttributedDomain: attributedDomain);
+                AttributedDomain: attributedDomain,
+                ServiceId: serviceId);
         }
 
         return new FrameRouteResult(
@@ -262,7 +272,8 @@ public sealed class FrameRouter
             meteredByteCount,
             observation,
             Flow: observation is { Source: DomainObservationSource.Dns } ? null : flowKey,
-            AttributedDomain: attributedDomain);
+            AttributedDomain: attributedDomain,
+            ServiceId: serviceId);
     }
 
     private static ServiceFlowKey CreateFlowKey(

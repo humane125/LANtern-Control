@@ -50,18 +50,69 @@ public sealed class TokenBucket
 
         lock (sync)
         {
-            var now = clockSeconds();
-            var elapsed = Math.Max(0, now - lastRefill);
-            available = Math.Min(capacity, available + (elapsed * bytesPerSecond));
-            lastRefill = now;
+            Refill();
 
-            if (available + 0.000001 < byteCount)
+            if (!CanConsume(byteCount))
             {
                 return false;
             }
 
-            available -= byteCount;
+            Consume(byteCount);
             return true;
+        }
+    }
+
+    public static bool TryConsumeBoth(
+        TokenBucket parent,
+        TokenBucket child,
+        int byteCount)
+    {
+        ArgumentNullException.ThrowIfNull(parent);
+        ArgumentNullException.ThrowIfNull(child);
+        if (byteCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(byteCount));
+        }
+
+        lock (parent.sync)
+        {
+            lock (child.sync)
+            {
+                parent.Refill();
+                child.Refill();
+                if (!parent.CanConsume(byteCount) || !child.CanConsume(byteCount))
+                {
+                    return false;
+                }
+
+                parent.Consume(byteCount);
+                child.Consume(byteCount);
+                return true;
+            }
+        }
+    }
+
+    private void Refill()
+    {
+        if (bytesPerSecond == 0)
+        {
+            return;
+        }
+
+        var now = clockSeconds();
+        var elapsed = Math.Max(0, now - lastRefill);
+        available = Math.Min(capacity, available + (elapsed * bytesPerSecond));
+        lastRefill = now;
+    }
+
+    private bool CanConsume(int byteCount) =>
+        bytesPerSecond == 0 || available + 0.000001 >= byteCount;
+
+    private void Consume(int byteCount)
+    {
+        if (bytesPerSecond > 0)
+        {
+            available -= byteCount;
         }
     }
 }

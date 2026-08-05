@@ -17,7 +17,7 @@ public sealed class TrafficPolicy
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string[]> blockedDomains =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<ServiceRuleKey, ServiceTrafficRule> serviceRules = [];
+    private readonly ConcurrentDictionary<ServiceRuleKey, ServiceLimiters> serviceRules = [];
     private readonly Func<double>? clockSeconds;
     private int safeModeEnabled;
 
@@ -61,7 +61,7 @@ public sealed class TrafficPolicy
             blockedDomains.ContainsKey(macKey) ||
             serviceRules.Any(pair =>
                 pair.Key.MacKey.Equals(macKey, StringComparison.OrdinalIgnoreCase) &&
-                !pair.Value.IsUnlimited);
+                !pair.Value.Rule.IsUnlimited);
         if (!requiresEnforcement)
         {
             return InterceptionTargets.None;
@@ -91,14 +91,17 @@ public sealed class TrafficPolicy
             return;
         }
 
-        serviceRules[key] = normalized;
+        serviceRules[key] = new ServiceLimiters(
+            normalized,
+            new TokenBucket(normalized.DownloadKiloBytesPerSecond * 1_000D, clockSeconds),
+            new TokenBucket(normalized.UploadKiloBytesPerSecond * 1_000D, clockSeconds));
     }
 
     public ServiceTrafficRule GetServiceRule(string macAddress, string serviceId) =>
         serviceRules.TryGetValue(
             new ServiceRuleKey(NormalizeMac(macAddress), NormalizeServiceId(serviceId)),
             out var rule)
-            ? rule
+            ? rule.Rule
             : new ServiceTrafficRule(0, 0);
 
     public IReadOnlyDictionary<string, ServiceTrafficRule> GetServiceRules(string macAddress)
@@ -108,7 +111,7 @@ public sealed class TrafficPolicy
             .Where(pair => pair.Key.MacKey.Equals(macKey, StringComparison.OrdinalIgnoreCase))
             .ToDictionary(
                 pair => pair.Key.ServiceId,
-                pair => pair.Value,
+                pair => pair.Value.Rule,
                 StringComparer.OrdinalIgnoreCase);
     }
 
@@ -154,19 +157,40 @@ public sealed class TrafficPolicy
 
     public bool ShouldForward(string macAddress, TrafficDirection direction, int byteCount)
     {
-        if (!rules.TryGetValue(NormalizeMac(macAddress), out var limiters))
-        {
-            return true;
-        }
+        return ShouldForward(macAddress, null, direction, byteCount);
+    }
+
+    public bool ShouldForward(
+        string macAddress,
+        string? serviceId,
+        TrafficDirection direction,
+        int byteCount)
+    {
+        var macKey = NormalizeMac(macAddress);
+        var limiters = rules.GetOrAdd(
+            macKey,
+            _ => CreateDeviceLimiters(new TrafficRule(false, 0, 0)));
 
         if (limiters.Rule.PauseInternet)
         {
             return false;
         }
 
-        return direction == TrafficDirection.Download
-            ? limiters.Download.TryConsume(byteCount)
-            : limiters.Upload.TryConsume(byteCount);
+        var parent = direction == TrafficDirection.Download
+            ? limiters.Download
+            : limiters.Upload;
+        if (string.IsNullOrWhiteSpace(serviceId) ||
+            !serviceRules.TryGetValue(
+                new ServiceRuleKey(macKey, serviceId.Trim().ToLowerInvariant()),
+                out var serviceLimiters))
+        {
+            return parent.TryConsume(byteCount);
+        }
+
+        var child = direction == TrafficDirection.Download
+            ? serviceLimiters.Download
+            : serviceLimiters.Upload;
+        return TokenBucket.TryConsumeBoth(parent, child, byteCount);
     }
 
     public static string NormalizeMac(string value)
@@ -220,6 +244,20 @@ public sealed class TrafficPolicy
         TrafficRule Rule,
         TokenBucket Download,
         TokenBucket Upload);
+
+    private sealed record ServiceLimiters(
+        ServiceTrafficRule Rule,
+        TokenBucket Download,
+        TokenBucket Upload);
+
+    private DeviceLimiters CreateDeviceLimiters(TrafficRule rule)
+    {
+        var normalized = rule.Normalize();
+        return new DeviceLimiters(
+            normalized,
+            new TokenBucket(normalized.DownloadKiloBytesPerSecond * 1_000D, clockSeconds),
+            new TokenBucket(normalized.UploadKiloBytesPerSecond * 1_000D, clockSeconds));
+    }
 
     private static string NormalizeServiceId(string value)
     {

@@ -209,6 +209,8 @@ public sealed class FrameRouterTests
 
         Assert.Equal("www.youtube.com", uploadResult.AttributedDomain);
         Assert.Equal("www.youtube.com", downloadResult.AttributedDomain);
+        Assert.Equal("youtube", uploadResult.ServiceId);
+        Assert.Equal("youtube", downloadResult.ServiceId);
         Assert.NotNull(uploadResult.Flow);
         Assert.Equal(uploadResult.Flow, downloadResult.Flow);
         Assert.Equal(clientPort, downloadResult.Flow!.Value.ClientPort);
