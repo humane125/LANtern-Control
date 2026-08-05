@@ -73,7 +73,8 @@ public static class ArpInterceptionFrames
                 gatewayIp,
                 clientMac,
                 clientIp),
-            EthernetFrameCodec.BuildArpReply(
+            EthernetFrameCodec.BuildArpReplyWithEthernetSource(
+                controllerMac,
                 clientMac,
                 clientIp,
                 gatewayMac,

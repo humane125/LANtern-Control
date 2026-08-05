@@ -78,7 +78,7 @@ public sealed class ArpInterceptionFramesTests
     }
 
     [Fact]
-    public void BuildRestore_AdvertisesTheRealPeersToBothSides()
+    public void BuildRestore_UsesControllerEthernetSourceSoWifiCanReachGateway()
     {
         var frames = ArpInterceptionFrames.BuildRestore(
             LocalMac,
@@ -88,8 +88,8 @@ public sealed class ArpInterceptionFramesTests
             ClientMac);
 
         Assert.True(EthernetFrameCodec.TryParseArp(frames.ToGateway, out var toGateway));
-        Assert.Equal(ClientMac, toGateway.EthernetSourceMac);
-        Assert.True(toGateway.HasConsistentSender);
+        Assert.Equal(LocalMac, toGateway.EthernetSourceMac);
+        Assert.False(toGateway.HasConsistentSender);
         Assert.Equal(ClientMac, toGateway.SenderMac);
         Assert.Equal(ClientIp, toGateway.SenderIp);
         Assert.Equal(GatewayMac, toGateway.TargetMac);
