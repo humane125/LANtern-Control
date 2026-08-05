@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Lantern.Core.Services;
 
 namespace Lantern.Core.Control;
 
@@ -16,7 +17,9 @@ public sealed class TrafficPolicy
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string[]> blockedDomains =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<ServiceRuleKey, ServiceTrafficRule> serviceRules = [];
     private readonly Func<double>? clockSeconds;
+    private int safeModeEnabled;
 
     public TrafficPolicy(Func<double>? clockSeconds = null)
     {
@@ -44,8 +47,69 @@ public sealed class TrafficPolicy
 
     public InterceptionTargets GetInterceptionTargets(string macAddress)
     {
-        _ = NormalizeMac(macAddress);
+        var macKey = NormalizeMac(macAddress);
+        if (!SafeModeEnabled)
+        {
+            return InterceptionTargets.Client | InterceptionTargets.Gateway;
+        }
+
+        var rule = GetRule(macKey);
+        var requiresEnforcement =
+            rule.PauseInternet ||
+            rule.DownloadKiloBytesPerSecond > 0 ||
+            rule.UploadKiloBytesPerSecond > 0 ||
+            blockedDomains.ContainsKey(macKey) ||
+            serviceRules.Any(pair =>
+                pair.Key.MacKey.Equals(macKey, StringComparison.OrdinalIgnoreCase) &&
+                !pair.Value.IsUnlimited);
+        if (!requiresEnforcement)
+        {
+            return InterceptionTargets.None;
+        }
+
         return InterceptionTargets.Client | InterceptionTargets.Gateway;
+    }
+
+    public bool SafeModeEnabled => Volatile.Read(ref safeModeEnabled) != 0;
+
+    public void SetSafeMode(bool enabled) =>
+        Volatile.Write(ref safeModeEnabled, enabled ? 1 : 0);
+
+    public void SetServiceRule(
+        string macAddress,
+        string serviceId,
+        ServiceTrafficRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        var key = new ServiceRuleKey(
+            NormalizeMac(macAddress),
+            NormalizeServiceId(serviceId));
+        var normalized = rule.Normalize();
+        if (normalized.IsUnlimited)
+        {
+            serviceRules.TryRemove(key, out _);
+            return;
+        }
+
+        serviceRules[key] = normalized;
+    }
+
+    public ServiceTrafficRule GetServiceRule(string macAddress, string serviceId) =>
+        serviceRules.TryGetValue(
+            new ServiceRuleKey(NormalizeMac(macAddress), NormalizeServiceId(serviceId)),
+            out var rule)
+            ? rule
+            : new ServiceTrafficRule(0, 0);
+
+    public IReadOnlyDictionary<string, ServiceTrafficRule> GetServiceRules(string macAddress)
+    {
+        var macKey = NormalizeMac(macAddress);
+        return serviceRules
+            .Where(pair => pair.Key.MacKey.Equals(macKey, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(
+                pair => pair.Key.ServiceId,
+                pair => pair.Value,
+                StringComparer.OrdinalIgnoreCase);
     }
 
     public void RemoveRule(string macAddress) => rules.TryRemove(NormalizeMac(macAddress), out _);
@@ -156,4 +220,19 @@ public sealed class TrafficPolicy
         TrafficRule Rule,
         TokenBucket Download,
         TokenBucket Upload);
+
+    private static string NormalizeServiceId(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        var normalized = value.Trim().ToLowerInvariant();
+        if (!ServiceDefinitionCatalog.All.Any(service =>
+                service.Id.Equals(normalized, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ArgumentException($"Unknown service ID '{value}'.", nameof(value));
+        }
+
+        return normalized;
+    }
+
+    private readonly record struct ServiceRuleKey(string MacKey, string ServiceId);
 }

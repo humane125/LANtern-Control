@@ -1,3 +1,4 @@
+using Lantern.Core.Control;
 using Lantern.Core.Settings;
 
 namespace Lantern.Core.Tests;
@@ -264,6 +265,43 @@ public sealed class SettingsStoreTests
 
             Assert.True(loaded.DisableUpdateChecks);
             Assert.Equal(checkedAt.ToUniversalTime(), loaded.LastUpdateCheckUtc);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SaveAndLoad_PersistsSafeModePromptAndNormalizedServiceLimits()
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var store = new SettingsStore(directory);
+            var settings = new AppSettings
+            {
+                SafeModeEnabled = true,
+                SuppressWifiSafeModePrompt = true,
+            };
+            settings.ServiceLimits["e2:61:19:0d:bd:54"] =
+                new Dictionary<string, ServiceTrafficRule>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["YouTube"] = new(-10, 500),
+                    ["unknown-service"] = new(100, 100),
+                    ["spotify"] = new(0, 0),
+                };
+
+            await store.SaveAsync(settings);
+            var loaded = await store.LoadAsync();
+
+            Assert.True(loaded.SafeModeEnabled);
+            Assert.True(loaded.SuppressWifiSafeModePrompt);
+            var deviceRules = Assert.Single(loaded.ServiceLimits);
+            Assert.Equal("E261190DBD54", deviceRules.Key);
+            var service = Assert.Single(deviceRules.Value);
+            Assert.Equal("youtube", service.Key);
+            Assert.Equal(new ServiceTrafficRule(0, 500), service.Value);
         }
         finally
         {

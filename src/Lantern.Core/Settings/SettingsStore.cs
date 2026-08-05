@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Collections.Concurrent;
 using Lantern.Core.Control;
+using Lantern.Core.Services;
 
 namespace Lantern.Core.Settings;
 
@@ -161,6 +162,8 @@ public sealed class SettingsStore
         {
             DisableUpdateChecks = settings.DisableUpdateChecks,
             LastUpdateCheckUtc = settings.LastUpdateCheckUtc?.ToUniversalTime(),
+            SafeModeEnabled = settings.SafeModeEnabled,
+            SuppressWifiSafeModePrompt = settings.SuppressWifiSafeModePrompt,
         };
         foreach (var pair in settings.Devices)
         {
@@ -273,6 +276,44 @@ public sealed class SettingsStore
             }
 
             blockedDomains.Sort(StringComparer.OrdinalIgnoreCase);
+        }
+
+        foreach (var pair in settings.ServiceLimits)
+        {
+            string mac;
+            try
+            {
+                mac = TrafficPolicy.NormalizeMac(pair.Key);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            var rules = new Dictionary<string, ServiceTrafficRule>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var servicePair in pair.Value ?? [])
+            {
+                var service = ServiceDefinitionCatalog.All.FirstOrDefault(candidate =>
+                    candidate.Id.Equals(
+                        servicePair.Key?.Trim(),
+                        StringComparison.OrdinalIgnoreCase));
+                if (service is null || servicePair.Value is null)
+                {
+                    continue;
+                }
+
+                var rule = servicePair.Value.Normalize();
+                if (!rule.IsUnlimited)
+                {
+                    rules[service.Id] = rule;
+                }
+            }
+
+            if (rules.Count > 0)
+            {
+                normalized.ServiceLimits[mac] = rules;
+            }
         }
 
         return normalized;

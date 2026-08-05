@@ -130,6 +130,65 @@ public sealed class TrafficControlTests
             policy.GetInterceptionTargets("00:11:22:33:44:05"));
     }
 
+    [Fact]
+    public void TrafficPolicy_SafeModeInterceptsOnlyDevicesWithEnforceableRules()
+    {
+        const string unrestricted = "00:11:22:33:44:01";
+        const string deviceLimited = "00:11:22:33:44:02";
+        const string serviceLimited = "00:11:22:33:44:03";
+        const string domainBlocked = "00:11:22:33:44:04";
+        var policy = new TrafficPolicy();
+        policy.SetRule(unrestricted, new TrafficRule(false, 0, 0));
+        policy.SetRule(deviceLimited, new TrafficRule(false, 100, 0));
+        policy.SetServiceRule(
+            serviceLimited,
+            "youtube",
+            new ServiceTrafficRule(1_000, 0));
+        policy.SetBlockedDomains(domainBlocked, ["youtube.com"]);
+
+        policy.SetSafeMode(true);
+
+        Assert.Equal(InterceptionTargets.None, policy.GetInterceptionTargets(unrestricted));
+        Assert.Equal(
+            InterceptionTargets.Client | InterceptionTargets.Gateway,
+            policy.GetInterceptionTargets(deviceLimited));
+        Assert.Equal(
+            InterceptionTargets.Client | InterceptionTargets.Gateway,
+            policy.GetInterceptionTargets(serviceLimited));
+        Assert.Equal(
+            InterceptionTargets.Client | InterceptionTargets.Gateway,
+            policy.GetInterceptionTargets(domainBlocked));
+    }
+
+    [Fact]
+    public void TrafficPolicy_DisablingSafeModeRestoresInterceptAllMonitoring()
+    {
+        const string mac = "00:11:22:33:44:01";
+        var policy = new TrafficPolicy();
+        policy.SetSafeMode(true);
+        Assert.Equal(InterceptionTargets.None, policy.GetInterceptionTargets(mac));
+
+        policy.SetSafeMode(false);
+
+        Assert.Equal(
+            InterceptionTargets.Client | InterceptionTargets.Gateway,
+            policy.GetInterceptionTargets(mac));
+    }
+
+    [Fact]
+    public void TrafficPolicy_ZeroServiceRuleRemovesInterceptionRequirement()
+    {
+        const string mac = "00:11:22:33:44:01";
+        var policy = new TrafficPolicy();
+        policy.SetSafeMode(true);
+        policy.SetServiceRule(mac, "youtube", new ServiceTrafficRule(100, 50));
+
+        policy.SetServiceRule(mac, "youtube", new ServiceTrafficRule(0, 0));
+
+        Assert.Empty(policy.GetServiceRules(mac));
+        Assert.Equal(InterceptionTargets.None, policy.GetInterceptionTargets(mac));
+    }
+
     [Theory]
     [InlineData(false, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]
     [InlineData(true, 0, 0, InterceptionTargets.Client | InterceptionTargets.Gateway)]

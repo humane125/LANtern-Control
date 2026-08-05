@@ -1,3 +1,5 @@
+using Lantern.Core.Control;
+
 namespace Lantern.Core.Settings;
 
 public sealed class AppSettings
@@ -6,6 +8,10 @@ public sealed class AppSettings
 
     public DateTimeOffset? LastUpdateCheckUtc { get; set; }
 
+    public bool SafeModeEnabled { get; set; }
+
+    public bool SuppressWifiSafeModePrompt { get; set; }
+
     public Dictionary<string, DevicePreferences> Devices { get; init; } =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -13,6 +19,9 @@ public sealed class AppSettings
         new(StringComparer.OrdinalIgnoreCase);
 
     public Dictionary<string, List<string>> AppliedDomainPresets { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public Dictionary<string, Dictionary<string, ServiceTrafficRule>> ServiceLimits { get; init; } =
         new(StringComparer.OrdinalIgnoreCase);
 }
 
