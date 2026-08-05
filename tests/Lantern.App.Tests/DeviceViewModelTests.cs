@@ -19,6 +19,23 @@ namespace Lantern.App.Tests;
 public sealed class DeviceViewModelTests
 {
     [Fact]
+    public void SafeModePrompt_UsesThemedPreferenceChip()
+    {
+        var xaml = File.ReadAllText(Path.Combine(
+            GetProjectRoot(),
+            "src",
+            "Lantern.App",
+            "SafeModePromptWindow.xaml"));
+
+        Assert.Contains("x:Key=\"PromptPreferenceCheckBoxStyle\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DontAskAgainCheckBox\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Remember this choice on Wi-Fi", xaml, StringComparison.Ordinal);
+        Assert.Contains("Property=\"IsChecked\" Value=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Property=\"IsMouseOver\" Value=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Property=\"IsKeyboardFocused\" Value=\"True\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ApplicationIcon_ContainsWindowsIconFramesForSmallAndLargeSizes()
     {
         var iconPath = Path.Combine(

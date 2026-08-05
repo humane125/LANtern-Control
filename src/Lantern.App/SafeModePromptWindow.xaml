@@ -8,6 +8,96 @@
         ResizeMode="NoResize" ShowInTaskbar="False"
         AllowsTransparency="True" Background="Transparent"
         Foreground="{StaticResource PrimaryText}">
+    <Window.Resources>
+        <Style x:Key="PromptPreferenceCheckBoxStyle" TargetType="{x:Type CheckBox}">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type CheckBox}">
+                        <Border x:Name="PreferenceChip"
+                                Padding="11,8"
+                                Background="#100D10"
+                                BorderBrush="#3A282E"
+                                BorderThickness="1"
+                                CornerRadius="11">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid Width="22" Height="22" VerticalAlignment="Center">
+                                    <Border x:Name="SelectionGlow"
+                                            Margin="2"
+                                            Background="#D72C43"
+                                            CornerRadius="7"
+                                            Opacity="0">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="13"
+                                                              ShadowDepth="0"
+                                                              Color="#D72C43" />
+                                        </Border.Effect>
+                                    </Border>
+                                    <Border x:Name="SelectionBox"
+                                            Background="#0B090B"
+                                            BorderBrush="#70404A"
+                                            BorderThickness="1"
+                                            CornerRadius="7" />
+                                    <Path x:Name="SelectionCheck"
+                                          Width="12" Height="9"
+                                          Data="M 1,4 L 4.5,7.5 L 11,1"
+                                          Stroke="#FFF7F8"
+                                          StrokeThickness="2"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round"
+                                          Stretch="Fill"
+                                          Visibility="Collapsed" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                    <TextBlock Text="Don't ask again"
+                                               FontSize="12"
+                                               FontWeight="SemiBold" />
+                                    <TextBlock Margin="0,2,0,0"
+                                               Text="Remember this choice on Wi-Fi"
+                                               Foreground="{StaticResource SecondaryText}"
+                                               FontSize="10" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PreferenceChip" Property="Background" Value="#171116" />
+                                <Setter TargetName="PreferenceChip" Property="BorderBrush" Value="#6E2938" />
+                                <Setter TargetName="SelectionBox" Property="BorderBrush" Value="#B32941" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="PreferenceChip" Property="BorderBrush" Value="#D72C43" />
+                                <Setter TargetName="PreferenceChip" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="PreferenceChip" Property="Padding" Value="10,7" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="PreferenceChip" Property="Background" Value="#211219" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="PreferenceChip" Property="Background" Value="#180C11" />
+                                <Setter TargetName="PreferenceChip" Property="BorderBrush" Value="#7F1729" />
+                                <Setter TargetName="SelectionBox" Property="Background" Value="#D72C43" />
+                                <Setter TargetName="SelectionBox" Property="BorderBrush" Value="#F04A61" />
+                                <Setter TargetName="SelectionGlow" Property="Opacity" Value="0.58" />
+                                <Setter TargetName="SelectionCheck" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="PreferenceChip" Property="Opacity" Value="0.48" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Border Margin="18" CornerRadius="18" Background="{StaticResource WindowBackground}"
             BorderBrush="#6E1828" BorderThickness="1">
         <Border.Effect>
@@ -44,8 +134,11 @@
                     <TextBlock Margin="0,10,0,0" Foreground="{StaticResource SecondaryText}"
                                FontSize="13" LineHeight="20" TextWrapping="Wrap"
                                Text="Safe Mode discovers every device, but only forwards traffic for devices with a speed limit, service limit, pause, or domain rule. This reduces Wi-Fi load and latency."/>
-                    <CheckBox x:Name="DontAskAgainCheckBox" Margin="0,18,0,0"
-                              Content="Don't ask again"/>
+                    <CheckBox x:Name="DontAskAgainCheckBox"
+                              Margin="0,16,0,0"
+                              Style="{StaticResource PromptPreferenceCheckBoxStyle}"
+                              AutomationProperties.Name="Don't ask again"
+                              AutomationProperties.HelpText="Remember this choice on Wi-Fi" />
                 </StackPanel>
                 <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,24,0,0"
                             Orientation="Horizontal" HorizontalAlignment="Right">
