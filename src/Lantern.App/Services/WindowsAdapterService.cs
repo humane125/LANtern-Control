@@ -44,8 +44,15 @@ public static class WindowsAdapterService
             address.Address,
             address.PrefixLength,
             gateway.Address,
-            adapter.GetPhysicalAddress());
+            adapter.GetPhysicalAddress())
+        {
+            ConnectionKind = MapConnectionKind(adapter.NetworkInterfaceType),
+        };
     }
+
+    public static AdapterConnectionKind MapConnectionKind(
+        NetworkInterfaceType interfaceType) =>
+        AdapterConnectionKindClassifier.FromNetworkInterfaceType(interfaceType);
 
     private static bool IsDefaultPrivateLan(AdapterProfile profile)
     {

@@ -1,11 +1,31 @@
 using System.Net;
 using System.Net.NetworkInformation;
+using Lantern.Core.Networking;
 using Lantern.Linux.Services;
 
 namespace Lantern.Linux.Tests;
 
 public sealed class LinuxAdapterServiceTests
 {
+    [Fact]
+    public void BuildProfiles_MapsWirelessInterfaceTypeToWifi()
+    {
+        var snapshot = new LinuxInterfaceSnapshot(
+            "wlan0",
+            "Wi-Fi",
+            "Wireless",
+            true,
+            PhysicalAddress.Parse("001122334455"),
+            [(IPAddress.Parse("192.168.31.20"), 24)],
+            [IPAddress.Parse("192.168.31.1")]) with
+        {
+            InterfaceType = NetworkInterfaceType.Wireless80211,
+        };
+
+        var profile = Assert.Single(LinuxAdapterService.BuildProfiles([snapshot]));
+
+        Assert.Equal(AdapterConnectionKind.Wifi, profile.ConnectionKind);
+    }
     [Fact]
     public void BuildProfiles_ReturnsOnlyUsableIpv4InterfacesWithGateways()
     {

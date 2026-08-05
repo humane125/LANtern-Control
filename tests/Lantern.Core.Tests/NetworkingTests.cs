@@ -1,11 +1,34 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using Lantern.Core.Networking;
+using Lantern.Core.Settings;
 
 namespace Lantern.Core.Tests;
 
 public sealed class NetworkingTests
 {
+    [Theory]
+    [InlineData(AdapterConnectionKind.Wifi, false, false, false, true)]
+    [InlineData(AdapterConnectionKind.Ethernet, false, false, false, false)]
+    [InlineData(AdapterConnectionKind.Unknown, false, false, false, false)]
+    [InlineData(AdapterConnectionKind.Wifi, true, false, false, false)]
+    [InlineData(AdapterConnectionKind.Wifi, false, true, false, false)]
+    [InlineData(AdapterConnectionKind.Wifi, false, false, true, false)]
+    public void WifiSafeModePromptPolicy_PromptsOnlyOnceForEligibleWifi(
+        AdapterConnectionKind kind,
+        bool safeModeEnabled,
+        bool suppressed,
+        bool shownThisLaunch,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            WifiSafeModePromptPolicy.ShouldPrompt(
+                kind,
+                safeModeEnabled,
+                suppressed,
+                shownThisLaunch));
+    }
     [Fact]
     public void EnumerateHosts_ReturnsUsableAddressesForSlash30()
     {

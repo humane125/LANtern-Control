@@ -12,7 +12,11 @@ public sealed record LinuxInterfaceSnapshot(
     bool IsUp,
     PhysicalAddress MacAddress,
     IReadOnlyList<(IPAddress Address, int PrefixLength)> Addresses,
-    IReadOnlyList<IPAddress> Gateways);
+    IReadOnlyList<IPAddress> Gateways)
+{
+    public NetworkInterfaceType InterfaceType { get; init; } =
+        NetworkInterfaceType.Unknown;
+}
 
 public static class LinuxAdapterService
 {
@@ -42,7 +46,11 @@ public static class LinuxAdapterService
                         address.Address,
                         address.PrefixLength,
                         gateway,
-                        item.MacAddress);
+                        item.MacAddress)
+                    {
+                        ConnectionKind = AdapterConnectionKindClassifier
+                            .FromNetworkInterfaceType(item.InterfaceType),
+                    };
             })
             .Where(profile => profile is not null)
             .Cast<AdapterProfile>()
@@ -63,6 +71,9 @@ public static class LinuxAdapterService
                 .Where(address => address.Address.AddressFamily == AddressFamily.InterNetwork)
                 .Select(address => (address.Address, address.PrefixLength))
                 .ToArray(),
-            properties.GatewayAddresses.Select(gateway => gateway.Address).ToArray());
+            properties.GatewayAddresses.Select(gateway => gateway.Address).ToArray())
+        {
+            InterfaceType = adapter.NetworkInterfaceType,
+        };
     }
 }

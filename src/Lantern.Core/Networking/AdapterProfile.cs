@@ -12,5 +12,8 @@ public sealed record AdapterProfile(
     IPAddress GatewayAddress,
     PhysicalAddress LocalMac)
 {
+    public AdapterConnectionKind ConnectionKind { get; init; } =
+        AdapterConnectionKind.Unknown;
+
     public string Summary => $"{LocalAddress}/{PrefixLength}  •  Gateway {GatewayAddress}";
 }
