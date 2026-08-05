@@ -8,6 +8,50 @@ namespace Lantern.App.Tests;
 public sealed class ServiceInspectorPresentationTests
 {
     [Fact]
+    public void BuildRememberedIdentities_UsesSavedNamesForDevicesMissingFromTheLiveList()
+    {
+        var settings = new AppSettings();
+        settings.Devices["0E4F69CCE4F0"] = new DevicePreferences
+        {
+            LearnedHostName = "POCO-F6",
+            LastKnownIp = "192.168.31.213",
+        };
+        settings.Devices["D2574CDCA5B2"] = new DevicePreferences
+        {
+            Alias = "Pixel-10-Pro",
+            LearnedHostName = "Android",
+            LastKnownIp = "192.168.31.225",
+        };
+
+        var identities = ServiceInspectorPresentationBuilder.BuildRememberedIdentities(settings);
+
+        Assert.Equal("POCO-F6", identities["0E4F69CCE4F0"].DeviceName);
+        Assert.Equal("192.168.31.213", identities["0E4F69CCE4F0"].IpAddress);
+        Assert.Equal("Pixel-10-Pro", identities["D2574CDCA5B2"].DeviceName);
+        Assert.Equal("192.168.31.225", identities["D2574CDCA5B2"].IpAddress);
+    }
+
+    [Fact]
+    public void BuildRememberedIdentities_DoesNotReuseAnAmbiguousLearnedName()
+    {
+        var settings = new AppSettings();
+        settings.Devices["0E4F69CCE4F0"] = new DevicePreferences
+        {
+            LearnedHostName = "Humane",
+            LastKnownIp = "192.168.31.213",
+        };
+        settings.Devices["D2574CDCA5B2"] = new DevicePreferences
+        {
+            LearnedHostName = "Humane",
+            LastKnownIp = "192.168.31.225",
+        };
+
+        var identities = ServiceInspectorPresentationBuilder.BuildRememberedIdentities(settings);
+
+        Assert.Empty(identities);
+    }
+
+    [Fact]
     public void Build_GroupsSessionsByDeviceAndFormatsLiveAndDailyMetrics()
     {
         var now = new DateTimeOffset(2026, 8, 4, 12, 5, 0, TimeSpan.Zero);

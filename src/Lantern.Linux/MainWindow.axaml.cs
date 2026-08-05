@@ -827,10 +827,13 @@ public partial class MainWindow : Window
             .Where(group => group.IsExpanded)
             .Select(group => group.MacKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var identities = Devices.ToDictionary(
-            device => device.MacKey,
-            device => new ServiceDeviceIdentity(device.DisplayName, device.IpAddress),
-            StringComparer.OrdinalIgnoreCase);
+        var identities = ServiceInspectorPresentationBuilder.BuildRememberedIdentities(settings);
+        foreach (var device in Devices)
+        {
+            identities[device.MacKey] = new ServiceDeviceIdentity(
+                device.DisplayName,
+                device.IpAddress);
+        }
         var groups = ServiceInspectorPresentationBuilder.Build(
             engine.ServiceInspector.GetSnapshots(now),
             identities,

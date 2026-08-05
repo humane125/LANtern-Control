@@ -1,5 +1,6 @@
 using Lantern.Core.Services;
 using Lantern.Core.Settings;
+using Lantern.Core.Control;
 
 namespace Lantern.App.ViewModels;
 
@@ -7,6 +8,51 @@ public sealed record ServiceDeviceIdentity(string DeviceName, string IpAddress);
 
 public static class ServiceInspectorPresentationBuilder
 {
+    public static Dictionary<string, ServiceDeviceIdentity> BuildRememberedIdentities(
+        AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var ambiguousNames = settings.Devices.Values
+            .Select(preferences => Normalize(preferences.LearnedHostName))
+            .Where(name => name is not null)
+            .Cast<string>()
+            .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var identities = new Dictionary<string, ServiceDeviceIdentity>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in settings.Devices)
+        {
+            string macKey;
+            try
+            {
+                macKey = TrafficPolicy.NormalizeMac(pair.Key);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            var alias = Normalize(pair.Value.Alias);
+            var learnedName = Normalize(pair.Value.LearnedHostName);
+            var deviceName = alias ??
+                             (learnedName is not null && !ambiguousNames.Contains(learnedName)
+                                 ? learnedName
+                                 : null);
+            if (deviceName is null)
+            {
+                continue;
+            }
+
+            identities[macKey] = new ServiceDeviceIdentity(
+                deviceName,
+                Normalize(pair.Value.LastKnownIp) ?? "-");
+        }
+
+        return identities;
+    }
+
     public static IReadOnlyList<DeviceServiceGroupViewModel> Build(
         IReadOnlyList<ServiceSessionSnapshot> snapshots,
         IReadOnlyDictionary<string, ServiceDeviceIdentity> identities,
@@ -114,4 +160,7 @@ public static class ServiceInspectorPresentationBuilder
         macKey.Length == 12
             ? string.Join(":", Enumerable.Range(0, 6).Select(index => macKey.Substring(index * 2, 2)))
             : macKey;
+
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
