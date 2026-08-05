@@ -264,6 +264,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
 
     public async Task ApplyRuleAsync(string macAddress, TrafficRule rule)
     {
+        var previousTargets = policy.GetInterceptionTargets(macAddress);
         policy.SetRule(macAddress, rule.Normalize());
         if (framePacer is not null)
         {
@@ -281,7 +282,86 @@ public sealed class LinuxLanEngine : IAsyncDisposable
             TrafficPolicy.NormalizeMac(pair.Value.ToString()) == normalized);
         if (!client.Equals(default(KeyValuePair<IPAddress, PhysicalAddress>)))
         {
-            PoisonClient(client);
+            await ApplyInterceptionTransitionAsync(
+                client,
+                InterceptionTransition.Between(
+                    previousTargets,
+                    policy.GetInterceptionTargets(macAddress)));
+        }
+    }
+
+    public async Task ApplyServiceRuleAsync(
+        string macAddress,
+        string serviceId,
+        ServiceTrafficRule rule)
+    {
+        var previousTargets = policy.GetInterceptionTargets(macAddress);
+        policy.SetServiceRule(macAddress, serviceId, rule);
+        if (framePacer is not null)
+        {
+            await framePacer.ResetAsync(PhysicalAddress.Parse(
+                TrafficPolicy.NormalizeMac(macAddress)));
+        }
+
+        await ApplyRuleTransitionForClientAsync(
+            macAddress,
+            previousTargets,
+            policy.GetInterceptionTargets(macAddress));
+    }
+
+    public async Task ApplyBlockedDomainsAsync(
+        string macAddress,
+        IEnumerable<string> domains)
+    {
+        var previousTargets = policy.GetInterceptionTargets(macAddress);
+        policy.SetBlockedDomains(macAddress, domains);
+        await ApplyRuleTransitionForClientAsync(
+            macAddress,
+            previousTargets,
+            policy.GetInterceptionTargets(macAddress));
+    }
+
+    public async Task ApplySafeModeAsync(bool enabled)
+    {
+        var previous = clients.ToDictionary(
+            pair => TrafficPolicy.NormalizeMac(pair.Value.ToString()),
+            pair => policy.GetInterceptionTargets(pair.Value.ToString()),
+            StringComparer.OrdinalIgnoreCase);
+        policy.SetSafeMode(enabled);
+        if (!controlling)
+        {
+            return;
+        }
+
+        foreach (var client in clients)
+        {
+            var macKey = TrafficPolicy.NormalizeMac(client.Value.ToString());
+            await ApplyInterceptionTransitionAsync(
+                client,
+                InterceptionTransition.Between(
+                    previous.GetValueOrDefault(macKey),
+                    policy.GetInterceptionTargets(macKey)));
+        }
+    }
+
+    private async Task ApplyRuleTransitionForClientAsync(
+        string macAddress,
+        InterceptionTargets previousTargets,
+        InterceptionTargets currentTargets)
+    {
+        if (!controlling)
+        {
+            return;
+        }
+
+        var normalized = TrafficPolicy.NormalizeMac(macAddress);
+        var client = clients.FirstOrDefault(pair =>
+            TrafficPolicy.NormalizeMac(pair.Value.ToString()) == normalized);
+        if (!client.Equals(default(KeyValuePair<IPAddress, PhysicalAddress>)))
+        {
+            await ApplyInterceptionTransitionAsync(
+                client,
+                InterceptionTransition.Between(previousTargets, currentTargets));
         }
     }
 
@@ -877,6 +957,12 @@ public sealed class LinuxLanEngine : IAsyncDisposable
         if (request.TargetIp.Equals(activeProfile.GatewayAddress) &&
             clients.TryGetValue(request.SenderIp, out var clientMac))
         {
+            if (!policy.GetInterceptionTargets(clientMac.ToString())
+                    .HasFlag(InterceptionTargets.Client))
+            {
+                return;
+            }
+
             SendArpPacket(ArpInterceptionFrames.BuildPoison(
                 activeProfile.LocalMac,
                 activeProfile.GatewayAddress,
@@ -887,12 +973,51 @@ public sealed class LinuxLanEngine : IAsyncDisposable
         else if (request.SenderIp.Equals(activeProfile.GatewayAddress) &&
                  clients.TryGetValue(request.TargetIp, out var requestedMac))
         {
+            if (!policy.GetInterceptionTargets(requestedMac.ToString())
+                    .HasFlag(InterceptionTargets.Gateway))
+            {
+                return;
+            }
+
             SendArpPacket(ArpInterceptionFrames.BuildPoison(
                 activeProfile.LocalMac,
                 activeProfile.GatewayAddress,
                 activeGateway,
                 request.TargetIp,
                 requestedMac).ToGateway);
+        }
+    }
+
+    private async Task ApplyInterceptionTransitionAsync(
+        KeyValuePair<IPAddress, PhysicalAddress> client,
+        InterceptionTransition transition)
+    {
+        var activeProfile = profile;
+        var activeGateway = gatewayMac;
+        if (!controlling || restoring || activeProfile is null || activeGateway is null)
+        {
+            return;
+        }
+
+        if (transition.Restore == InterceptionTargets.None)
+        {
+            PoisonClient(client);
+            return;
+        }
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            if (!controlling || restoring || injectionDevice is null)
+            {
+                return;
+            }
+
+            SendRestoreFrames(client, activeProfile, activeGateway);
+            PoisonClient(client);
+            if (attempt < 2)
+            {
+                await Task.Delay(40);
+            }
         }
     }
 

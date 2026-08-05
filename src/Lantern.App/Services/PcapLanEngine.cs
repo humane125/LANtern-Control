@@ -484,6 +484,78 @@ public sealed class PcapLanEngine : IAsyncDisposable
         }
     }
 
+    public async Task ApplyServiceRuleAsync(
+        string macAddress,
+        string serviceId,
+        ServiceTrafficRule rule)
+    {
+        var previousTargets = policy.GetInterceptionTargets(macAddress);
+        policy.SetServiceRule(macAddress, serviceId, rule);
+        await ApplyRuleTransitionForClientAsync(
+            macAddress,
+            previousTargets,
+            policy.GetInterceptionTargets(macAddress));
+    }
+
+    public async Task ApplyBlockedDomainsAsync(
+        string macAddress,
+        IEnumerable<string> domains)
+    {
+        var previousTargets = policy.GetInterceptionTargets(macAddress);
+        policy.SetBlockedDomains(macAddress, domains);
+        await ApplyRuleTransitionForClientAsync(
+            macAddress,
+            previousTargets,
+            policy.GetInterceptionTargets(macAddress));
+    }
+
+    public async Task ApplySafeModeAsync(bool enabled)
+    {
+        var clients = clientMappings.Mappings;
+        var previous = clients.ToDictionary(
+            pair => TrafficPolicy.NormalizeMac(pair.Value.ToString()),
+            pair => policy.GetInterceptionTargets(pair.Value.ToString()),
+            StringComparer.OrdinalIgnoreCase);
+        policy.SetSafeMode(enabled);
+        if (!controlling)
+        {
+            return;
+        }
+
+        foreach (var client in clients)
+        {
+            var macKey = TrafficPolicy.NormalizeMac(client.Value.ToString());
+            await ApplyInterceptionTransitionAsync(
+                client,
+                InterceptionTransition.Between(
+                    previous.GetValueOrDefault(macKey),
+                    policy.GetInterceptionTargets(macKey)));
+        }
+    }
+
+    private async Task ApplyRuleTransitionForClientAsync(
+        string macAddress,
+        InterceptionTargets previousTargets,
+        InterceptionTargets currentTargets)
+    {
+        if (!controlling)
+        {
+            return;
+        }
+
+        var normalizedMac = TrafficPolicy.NormalizeMac(macAddress);
+        foreach (var client in clientMappings.Mappings)
+        {
+            if (TrafficPolicy.NormalizeMac(client.Value.ToString()) == normalizedMac)
+            {
+                await ApplyInterceptionTransitionAsync(
+                    client,
+                    InterceptionTransition.Between(previousTargets, currentTargets));
+                return;
+            }
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         await StopAsync();
