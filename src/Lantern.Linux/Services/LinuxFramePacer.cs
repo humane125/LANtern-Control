@@ -51,6 +51,15 @@ public sealed class LinuxFramePacer : IAsyncDisposable
         TrafficDirection direction,
         byte[] frame)
     {
+        return TryEnqueue(clientMac, null, direction, frame);
+    }
+
+    public bool TryEnqueue(
+        PhysicalAddress clientMac,
+        string? serviceId,
+        TrafficDirection direction,
+        byte[] frame)
+    {
         ArgumentNullException.ThrowIfNull(clientMac);
         ArgumentNullException.ThrowIfNull(frame);
         if (Volatile.Read(ref disposed) != 0)
@@ -67,13 +76,19 @@ public sealed class LinuxFramePacer : IAsyncDisposable
                 () => new FrameQueue(this, value),
                 LazyThreadSafetyMode.ExecutionAndPublication)).Value;
         var rule = policy.GetRule(key.ClientMac);
-        var kiloBytesPerSecond = key.Direction == TrafficDirection.Download
+        var serviceRule = policy.GetServiceRuleForTraffic(key.ClientMac, serviceId);
+        var deviceRate = key.Direction == TrafficDirection.Download
             ? rule.DownloadKiloBytesPerSecond
             : rule.UploadKiloBytesPerSecond;
-        var maximumQueuedBytes = kiloBytesPerSecond <= 0
+        var serviceRate = key.Direction == TrafficDirection.Download
+            ? serviceRule.DownloadKiloBytesPerSecond
+            : serviceRule.UploadKiloBytesPerSecond;
+        var limitedRates = new[] { deviceRate, serviceRate }.Where(rate => rate > 0).ToArray();
+        var effectiveRate = limitedRates.Length == 0 ? 0 : limitedRates.Min();
+        var maximumQueuedBytes = effectiveRate <= 0
             ? (long)UnlimitedQueueBytes
-            : Math.Max((long)MinimumLimitedQueueBytes, kiloBytesPerSecond * 250L);
-        return queue.TryWrite(frame, maximumQueuedBytes);
+            : Math.Max((long)MinimumLimitedQueueBytes, effectiveRate * 250L);
+        return queue.TryWrite(new QueuedFrame(serviceId, frame), maximumQueuedBytes);
     }
 
     public async Task ResetAsync(PhysicalAddress clientMac)
@@ -112,15 +127,17 @@ public sealed class LinuxFramePacer : IAsyncDisposable
 
     private async Task RunQueueAsync(
         QueueKey key,
-        ChannelReader<byte[]> reader,
+        ChannelReader<QueuedFrame> reader,
         FrameQueue queue,
         CancellationToken cancellationToken)
     {
         var nextSendAt = clockSeconds();
         var previousRate = -1;
+        var serviceSchedules = new Dictionary<string, ServiceSchedule>(
+            StringComparer.OrdinalIgnoreCase);
         try
         {
-            await foreach (var frame in reader.ReadAllAsync(cancellationToken))
+            await foreach (var queued in reader.ReadAllAsync(cancellationToken))
             {
                 try
                 {
@@ -131,29 +148,51 @@ public sealed class LinuxFramePacer : IAsyncDisposable
                         continue;
                     }
 
-                    var kiloBytesPerSecond = key.Direction == TrafficDirection.Download
+                    var serviceRule = policy.GetServiceRuleForTraffic(
+                        key.ClientMac,
+                        queued.ServiceId);
+                    var deviceRate = key.Direction == TrafficDirection.Download
                         ? rule.DownloadKiloBytesPerSecond
                         : rule.UploadKiloBytesPerSecond;
+                    var serviceRate = key.Direction == TrafficDirection.Download
+                        ? serviceRule.DownloadKiloBytesPerSecond
+                        : serviceRule.UploadKiloBytesPerSecond;
                     var now = clockSeconds();
-                    if (kiloBytesPerSecond <= 0)
+                    if (deviceRate <= 0)
                     {
                         previousRate = 0;
                         nextSendAt = now;
                     }
                     else
                     {
-                        if (kiloBytesPerSecond != previousRate)
+                        if (deviceRate != previousRate)
                         {
-                            previousRate = kiloBytesPerSecond;
+                            previousRate = deviceRate;
                             nextSendAt = now;
                         }
+                    }
 
-                        if (nextSendAt > now)
+                    ServiceSchedule? serviceSchedule = null;
+                    if (serviceRate > 0 && !string.IsNullOrWhiteSpace(queued.ServiceId))
+                    {
+                        if (!serviceSchedules.TryGetValue(
+                                queued.ServiceId,
+                                out serviceSchedule) ||
+                            serviceSchedule.Rate != serviceRate)
                         {
-                            await delayAsync(
-                                TimeSpan.FromSeconds(nextSendAt - now),
-                                cancellationToken);
+                            serviceSchedule = new ServiceSchedule(serviceRate, now);
+                            serviceSchedules[queued.ServiceId] = serviceSchedule;
                         }
+                    }
+
+                    var scheduledAt = Math.Max(
+                        deviceRate > 0 ? nextSendAt : now,
+                        serviceSchedule?.NextSendAt ?? now);
+                    if (scheduledAt > now)
+                    {
+                        await delayAsync(
+                            TimeSpan.FromSeconds(scheduledAt - now),
+                            cancellationToken);
                     }
 
                     rule = policy.GetRule(key.ClientMac);
@@ -163,20 +202,23 @@ public sealed class LinuxFramePacer : IAsyncDisposable
                         continue;
                     }
 
-                    sendFrame(frame);
-                    if (kiloBytesPerSecond > 0)
+                    sendFrame(queued.Frame);
+                    var scheduleBase = Math.Max(scheduledAt, clockSeconds() - 0.05D);
+                    if (deviceRate > 0)
                     {
-                        var bytesPerSecond = kiloBytesPerSecond * 1_000D;
-                        var scheduled = nextSendAt + (frame.Length / bytesPerSecond);
-                        // Task.Delay can overshoot short packet intervals. Keep the
-                        // original schedule so a small catch-up burst restores the
-                        // requested average, but never accumulate over 50 ms of debt.
-                        nextSendAt = Math.Max(scheduled, clockSeconds() - 0.05D);
+                        nextSendAt = scheduleBase +
+                            (queued.Frame.Length / (deviceRate * 1_000D));
+                    }
+
+                    if (serviceSchedule is not null)
+                    {
+                        serviceSchedule.NextSendAt = scheduleBase +
+                            (queued.Frame.Length / (serviceRate * 1_000D));
                     }
                 }
                 finally
                 {
-                    queue.Release(frame.Length);
+                    queue.Release(queued.Frame.Length);
                 }
             }
         }
@@ -196,6 +238,15 @@ public sealed class LinuxFramePacer : IAsyncDisposable
         string ClientMac,
         TrafficDirection Direction);
 
+    private readonly record struct QueuedFrame(string? ServiceId, byte[] Frame);
+
+    private sealed class ServiceSchedule(int rate, double nextSendAt)
+    {
+        public int Rate { get; } = rate;
+
+        public double NextSendAt { get; set; } = nextSendAt;
+    }
+
     private sealed class FrameQueue
     {
         private long queuedBytes;
@@ -204,7 +255,7 @@ public sealed class LinuxFramePacer : IAsyncDisposable
 
         public FrameQueue(LinuxFramePacer owner, QueueKey key)
         {
-            var channel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(
+            var channel = Channel.CreateBounded<QueuedFrame>(new BoundedChannelOptions(
                 owner.queueCapacity)
             {
                 FullMode = BoundedChannelFullMode.Wait,
@@ -221,15 +272,15 @@ public sealed class LinuxFramePacer : IAsyncDisposable
                 cancellation.Token));
         }
 
-        public ChannelWriter<byte[]> Writer { get; }
+        public ChannelWriter<QueuedFrame> Writer { get; }
         public Task Worker { get; }
 
-        public bool TryWrite(byte[] frame, long maximumQueuedBytes)
+        public bool TryWrite(QueuedFrame frame, long maximumQueuedBytes)
         {
-            var total = Interlocked.Add(ref queuedBytes, frame.Length);
+            var total = Interlocked.Add(ref queuedBytes, frame.Frame.Length);
             if (total > maximumQueuedBytes || !Writer.TryWrite(frame))
             {
-                Interlocked.Add(ref queuedBytes, -frame.Length);
+                Interlocked.Add(ref queuedBytes, -frame.Frame.Length);
                 return false;
             }
 

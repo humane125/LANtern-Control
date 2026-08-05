@@ -72,6 +72,47 @@ public sealed class LinuxFramePacerTests
     }
 
     [Fact]
+    public async Task ServiceLimitedFrames_ArePacedInsideAnUnlimitedDevice()
+    {
+        var clock = new ManualClock();
+        var delays = new ConcurrentQueue<TimeSpan>();
+        var sent = 0;
+        var completed = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var policy = new TrafficPolicy();
+        policy.SetServiceRule(
+            ClientMac.ToString(),
+            "youtube",
+            new ServiceTrafficRule(0, 1));
+        await using var pacer = new LinuxFramePacer(
+            policy,
+            _ =>
+            {
+                if (Interlocked.Increment(ref sent) == 2)
+                {
+                    completed.TrySetResult();
+                }
+            },
+            clock.Read,
+            (delay, _) =>
+            {
+                delays.Enqueue(delay);
+                clock.Advance(delay.TotalSeconds);
+                return Task.CompletedTask;
+            });
+
+        Assert.True(pacer.TryEnqueue(
+            ClientMac, "youtube", TrafficDirection.Upload, new byte[1_000]));
+        Assert.True(pacer.TryEnqueue(
+            ClientMac, "youtube", TrafficDirection.Upload, new byte[1_000]));
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var delay = Assert.Single(delays);
+        Assert.InRange(delay.TotalSeconds, 0.999, 1.001);
+        Assert.Equal(2, sent);
+    }
+
+    [Fact]
     public async Task LimitedQueue_RejectsADeepBurstBeforeItCreatesTcpTimeouts()
     {
         var policy = new TrafficPolicy();

@@ -104,6 +104,24 @@ public sealed class TrafficPolicy
             ? rule.Rule
             : new ServiceTrafficRule(0, 0);
 
+    public ServiceTrafficRule GetServiceRuleForTraffic(
+        string macAddress,
+        string? serviceId)
+    {
+        if (string.IsNullOrWhiteSpace(serviceId))
+        {
+            return new ServiceTrafficRule(0, 0);
+        }
+
+        return serviceRules.TryGetValue(
+            new ServiceRuleKey(
+                NormalizeMac(macAddress),
+                serviceId.Trim().ToLowerInvariant()),
+            out var rule)
+            ? rule.Rule
+            : new ServiceTrafficRule(0, 0);
+    }
+
     public IReadOnlyDictionary<string, ServiceTrafficRule> GetServiceRules(string macAddress)
     {
         var macKey = NormalizeMac(macAddress);

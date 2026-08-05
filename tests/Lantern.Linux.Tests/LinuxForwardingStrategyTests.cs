@@ -43,4 +43,20 @@ public sealed class LinuxForwardingStrategyTests
             rule,
             TrafficDirection.Upload));
     }
+
+    [Fact]
+    public void LimitedServiceRequiresPacingWhenDeviceIsUnlimited()
+    {
+        var deviceRule = new TrafficRule(false, 0, 0);
+        var serviceRule = new ServiceTrafficRule(100, 0);
+
+        Assert.True(LinuxForwardingStrategy.RequiresPacing(
+            deviceRule,
+            serviceRule,
+            TrafficDirection.Download));
+        Assert.False(LinuxForwardingStrategy.RequiresPacing(
+            deviceRule,
+            serviceRule,
+            TrafficDirection.Upload));
+    }
 }

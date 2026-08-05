@@ -680,7 +680,13 @@ public sealed class LinuxLanEngine : IAsyncDisposable
             result.ClientMac is { } forwardingClient)
         {
             var rule = policy.GetRule(forwardingClient.ToString());
-            if (!LinuxForwardingStrategy.RequiresPacing(rule, forwardingDirection))
+            var serviceRule = policy.GetServiceRuleForTraffic(
+                forwardingClient.ToString(),
+                result.ServiceId);
+            if (!LinuxForwardingStrategy.RequiresPacing(
+                    rule,
+                    serviceRule,
+                    forwardingDirection))
             {
                 // Unlimited packets must not cross an extra channel and worker
                 // boundary. Sending them immediately from the capture loop keeps
@@ -691,6 +697,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
             }
             else if (framePacer?.TryEnqueue(
                          forwardingClient,
+                         result.ServiceId,
                          forwardingDirection,
                          result.Frame) != true)
             {
