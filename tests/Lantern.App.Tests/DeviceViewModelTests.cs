@@ -36,6 +36,56 @@ public sealed class DeviceViewModelTests
     }
 
     [Fact]
+    public void SafeModePrompt_PreferenceChipDoesNotOverlapActionButtons()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var app = System.Windows.Application.Current as App ?? new App();
+                if (app.Resources.Count == 0)
+                {
+                    app.InitializeComponent();
+                }
+
+                var window = new SafeModePromptWindow();
+                var root = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
+                root.Measure(new System.Windows.Size(window.Width, window.Height));
+                root.Arrange(new Rect(0, 0, window.Width, window.Height));
+                root.UpdateLayout();
+
+                var preference = Assert.IsType<CheckBox>(
+                    window.FindName("DontAskAgainCheckBox"));
+                var preferenceBounds = preference
+                    .TransformToAncestor(root)
+                    .TransformBounds(new Rect(preference.RenderSize));
+                var firstActionTop = VisualDescendants<Button>(root)
+                    .Select(button => button
+                        .TransformToAncestor(root)
+                        .TransformBounds(new Rect(button.RenderSize)).Top)
+                    .Min();
+
+                Assert.True(
+                    preferenceBounds.Bottom + 16 <= firstActionTop,
+                    $"Preference chip bottom {preferenceBounds.Bottom:F1} overlaps action row top {firstActionTop:F1}.");
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+        {
+            throw failure;
+        }
+    }
+
+    [Fact]
     public void ApplicationIcon_ContainsWindowsIconFramesForSmallAndLargeSizes()
     {
         var iconPath = Path.Combine(
@@ -586,6 +636,24 @@ public sealed class DeviceViewModelTests
 
     private static string GetProjectRoot([CallerFilePath] string sourcePath = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourcePath)!, "..", ".."));
+
+    private static IEnumerable<T> VisualDescendants<T>(DependencyObject parent)
+        where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is T match)
+            {
+                yield return match;
+            }
+
+            foreach (var descendant in VisualDescendants<T>(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
 
     private static double ContrastRatio(
         System.Windows.Media.Color lighter,

@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:Lantern.Linux.Controls" x:Class="Lantern.Linux.SafeModePromptWindow"
-        Title="Wi-Fi Safe Mode" Width="570" Height="400" CanResize="False" ShowInTaskbar="False"
+        Title="Wi-Fi Safe Mode" Width="570" Height="430" CanResize="False" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner" SystemDecorations="None" TransparencyLevelHint="Transparent"
         Background="Transparent" Foreground="#F4EEF0" FontFamily="Inter">
   <Window.Styles>
