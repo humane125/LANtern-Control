@@ -1357,8 +1357,15 @@ public partial class MainWindow : Window
     private void ServiceLimitEditor_OnGotFocus(object sender, RoutedEventArgs eventArgs) =>
         serviceLimitEditorFocused = true;
 
-    private void ServiceLimitEditor_OnLostFocus(object sender, RoutedEventArgs eventArgs) =>
+    private void ServiceLimitEditor_OnLostFocus(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is TextBox editor)
+        {
+            editor.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        }
+
         serviceLimitEditorFocused = false;
+    }
 
     private async Task OnServiceRuleChangedAsync(
         string macKey,

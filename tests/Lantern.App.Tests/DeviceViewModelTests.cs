@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Shell;
 using Lantern.App;
 using Lantern.App.ViewModels;
+using Lantern.Core.Control;
 using Lantern.Core.Devices;
 using Lantern.Core.Settings;
 using Xunit;
@@ -214,6 +215,7 @@ public sealed class DeviceViewModelTests
                     Assert.Same(
                         window.FindResource("ActivityExpanderStyle"),
                         serviceExpander.Style);
+                    ServiceTrafficRule? changedServiceRule = null;
                     var service = new ServiceSessionViewModel(
                         "youtube",
                         "YouTube",
@@ -229,7 +231,10 @@ public sealed class DeviceViewModelTests
                         "2 connections",
                         "12:00:00",
                         "12:05:00",
-                        2_000);
+                        2_000,
+                        1_000,
+                        0,
+                        rule => changedServiceRule = rule);
                     serviceItem.DataContext = new DeviceServiceGroupViewModel(
                         "0E4F69CCE4F0",
                         "Phone",
@@ -239,6 +244,15 @@ public sealed class DeviceViewModelTests
                     serviceItem.Measure(new System.Windows.Size(1_400, 500));
                     serviceItem.Arrange(new Rect(0, 0, 1_400, 500));
                     serviceItem.UpdateLayout();
+                    var serviceDownloadEditor = Assert.Single(
+                        VisualDescendants<TextBox>(serviceItem),
+                        editor => BindingOperations.GetBinding(
+                            editor,
+                            TextBox.TextProperty)?.Path.Path == "DownloadLimit");
+                    serviceDownloadEditor.Text = "0";
+                    serviceDownloadEditor.RaiseEvent(
+                        new RoutedEventArgs(UIElement.LostFocusEvent));
+                    Assert.Equal(new ServiceTrafficRule(0, 0), changedServiceRule);
 
                     var overviewSection = Assert.IsType<Grid>(window.FindName("OverviewSection"));
                     var websiteSection = Assert.IsType<Border>(
