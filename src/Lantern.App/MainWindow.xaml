@@ -1328,15 +1328,15 @@
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="1">
                                                                         <TextBlock Text="CURRENT" Foreground="{StaticResource SecondaryText}" FontSize="9" />
-                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding DownloadRateText}"/><Run Text="  ↑ "/><Run Text="{Binding UploadRateText}"/></TextBlock>
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding DownloadRateText, Mode=OneWay}"/><Run Text="  ↑ "/><Run Text="{Binding UploadRateText, Mode=OneWay}"/></TextBlock>
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="2">
                                                                         <TextBlock Text="SESSION DATA" Foreground="{StaticResource SecondaryText}" FontSize="9" />
-                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding SessionDownloadText}"/><Run Text="  ↑ "/><Run Text="{Binding SessionUploadText}"/></TextBlock>
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding SessionDownloadText, Mode=OneWay}"/><Run Text="  ↑ "/><Run Text="{Binding SessionUploadText, Mode=OneWay}"/></TextBlock>
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="3">
                                                                         <TextBlock Text="TODAY" Foreground="{StaticResource SecondaryText}" FontSize="9" />
-                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding TodayDownloadText}"/><Run Text="  ↑ "/><Run Text="{Binding TodayUploadText}"/></TextBlock>
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="↓ "/><Run Text="{Binding TodayDownloadText, Mode=OneWay}"/><Run Text="  ↑ "/><Run Text="{Binding TodayUploadText, Mode=OneWay}"/></TextBlock>
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="4">
                                                                         <TextBlock Text="DURATION" Foreground="{StaticResource SecondaryText}" FontSize="9" />
@@ -1348,7 +1348,7 @@
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="6">
                                                                         <TextBlock Text="ACTIVITY" Foreground="{StaticResource SecondaryText}" FontSize="9" />
-                                                                        <TextBlock Margin="0,4,0,0"><Run Text="{Binding FirstSeenText}"/><Run Text=" → "/><Run Text="{Binding LastActivityText}"/></TextBlock>
+                                                                        <TextBlock Margin="0,4,0,0"><Run Text="{Binding FirstSeenText, Mode=OneWay}"/><Run Text=" → "/><Run Text="{Binding LastActivityText, Mode=OneWay}"/></TextBlock>
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="7" Margin="8,0,0,0">
                                                                         <TextBlock Text="DOWN LIMIT" Foreground="{StaticResource SecondaryText}" FontSize="9" />

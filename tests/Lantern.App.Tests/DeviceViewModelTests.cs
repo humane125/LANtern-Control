@@ -214,6 +214,31 @@ public sealed class DeviceViewModelTests
                     Assert.Same(
                         window.FindResource("ActivityExpanderStyle"),
                         serviceExpander.Style);
+                    var service = new ServiceSessionViewModel(
+                        "youtube",
+                        "YouTube",
+                        true,
+                        "Active",
+                        "1.6 KB/s",
+                        "400 B/s",
+                        "4.0 KB",
+                        "1.0 KB",
+                        "14.0 KB",
+                        "3.0 KB",
+                        "5m 00s",
+                        "2 connections",
+                        "12:00:00",
+                        "12:05:00",
+                        2_000);
+                    serviceItem.DataContext = new DeviceServiceGroupViewModel(
+                        "0E4F69CCE4F0",
+                        "Phone",
+                        "192.168.31.213",
+                        [service],
+                        true);
+                    serviceItem.Measure(new System.Windows.Size(1_400, 500));
+                    serviceItem.Arrange(new Rect(0, 0, 1_400, 500));
+                    serviceItem.UpdateLayout();
 
                     var overviewSection = Assert.IsType<Grid>(window.FindName("OverviewSection"));
                     var websiteSection = Assert.IsType<Border>(
