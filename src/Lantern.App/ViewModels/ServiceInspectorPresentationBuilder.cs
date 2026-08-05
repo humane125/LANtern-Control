@@ -60,15 +60,59 @@ public static class ServiceInspectorPresentationBuilder
         DateTimeOffset now,
         ISet<string> expandedMacKeys)
     {
+        return Build(
+            snapshots,
+            identities,
+            history,
+            now,
+            expandedMacKeys,
+            new Dictionary<string, Dictionary<string, ServiceTrafficRule>>(),
+            null,
+            includeCatalog: false);
+    }
+
+    public static IReadOnlyList<DeviceServiceGroupViewModel> Build(
+        IReadOnlyList<ServiceSessionSnapshot> snapshots,
+        IReadOnlyDictionary<string, ServiceDeviceIdentity> identities,
+        ServiceUsageHistory history,
+        DateTimeOffset now,
+        ISet<string> expandedMacKeys,
+        IReadOnlyDictionary<string, Dictionary<string, ServiceTrafficRule>> serviceLimits,
+        Action<string, string, ServiceTrafficRule>? ruleChanged)
+    {
+        return Build(
+            snapshots,
+            identities,
+            history,
+            now,
+            expandedMacKeys,
+            serviceLimits,
+            ruleChanged,
+            includeCatalog: true);
+    }
+
+    private static IReadOnlyList<DeviceServiceGroupViewModel> Build(
+        IReadOnlyList<ServiceSessionSnapshot> snapshots,
+        IReadOnlyDictionary<string, ServiceDeviceIdentity> identities,
+        ServiceUsageHistory history,
+        DateTimeOffset now,
+        ISet<string> expandedMacKeys,
+        IReadOnlyDictionary<string, Dictionary<string, ServiceTrafficRule>> serviceLimits,
+        Action<string, string, ServiceTrafficRule>? ruleChanged,
+        bool includeCatalog)
+    {
         ArgumentNullException.ThrowIfNull(snapshots);
         ArgumentNullException.ThrowIfNull(identities);
         ArgumentNullException.ThrowIfNull(history);
         ArgumentNullException.ThrowIfNull(expandedMacKeys);
+        ArgumentNullException.ThrowIfNull(serviceLimits);
 
         var today = DateOnly.FromDateTime(now.LocalDateTime);
         var todayServices = history.Days.FirstOrDefault(day => day.Date == today)?.Services ?? [];
-        var macKeys = snapshots.Select(snapshot => snapshot.MacKey)
+        var macKeys = identities.Keys
+            .Concat(snapshots.Select(snapshot => snapshot.MacKey))
             .Concat(todayServices.Select(aggregate => aggregate.MacKey))
+            .Concat(serviceLimits.Keys)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var result = new List<DeviceServiceGroupViewModel>(macKeys.Length);
@@ -81,14 +125,25 @@ public static class ServiceInspectorPresentationBuilder
             var historyByService = todayServices
                 .Where(aggregate => aggregate.MacKey.Equals(macKey, StringComparison.OrdinalIgnoreCase))
                 .ToDictionary(aggregate => aggregate.ServiceId, StringComparer.OrdinalIgnoreCase);
-            var serviceIds = currentByService.Keys
+            var configured = serviceLimits.GetValueOrDefault(macKey) ??
+                new Dictionary<string, ServiceTrafficRule>(StringComparer.OrdinalIgnoreCase);
+            var serviceIds = (includeCatalog
+                    ? ServiceDefinitionCatalog.All.Select(service => service.Id)
+                    : [])
+                .Concat(currentByService.Keys)
                 .Concat(historyByService.Keys)
+                .Concat(configured.Keys)
                 .Distinct(StringComparer.OrdinalIgnoreCase);
             var services = serviceIds
                 .Select(serviceId => BuildService(
+                    macKey,
+                    serviceId,
                     currentByService.GetValueOrDefault(serviceId),
-                    historyByService.GetValueOrDefault(serviceId)))
-                .OrderByDescending(service => service.IsActive)
+                    historyByService.GetValueOrDefault(serviceId),
+                    configured.GetValueOrDefault(serviceId),
+                    ruleChanged))
+                .OrderByDescending(service => service.IsConfigured)
+                .ThenByDescending(service => service.IsActive)
                 .ThenByDescending(service => service.TotalRate)
                 .ThenBy(service => service.ServiceName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -106,11 +161,18 @@ public static class ServiceInspectorPresentationBuilder
     }
 
     private static ServiceSessionViewModel BuildService(
+        string macKey,
+        string serviceId,
         ServiceSessionSnapshot? snapshot,
-        ServiceUsageAggregate? history)
+        ServiceUsageAggregate? history,
+        ServiceTrafficRule? configuredRule,
+        Action<string, string, ServiceTrafficRule>? ruleChanged)
     {
-        var serviceId = snapshot?.ServiceId ?? history?.ServiceId ?? "other";
-        var serviceName = snapshot?.ServiceName ?? history?.ServiceName ?? "Other";
+        serviceId = snapshot?.ServiceId ?? history?.ServiceId ?? serviceId;
+        var definition = ServiceDefinitionCatalog.All.FirstOrDefault(service =>
+            service.Id.Equals(serviceId, StringComparison.OrdinalIgnoreCase));
+        var serviceName = snapshot?.ServiceName ?? history?.ServiceName ??
+            definition?.Name ?? "Other";
         var currentDownload = snapshot?.DownloadBytes ?? 0;
         var currentUpload = snapshot?.UploadBytes ?? 0;
         var todayDownload = (history?.DownloadBytes ?? 0) + currentDownload;
@@ -132,7 +194,10 @@ public static class ServiceInspectorPresentationBuilder
             snapshot is null ? "-" : snapshot.FirstSeen.ToLocalTime().ToString("HH:mm:ss"),
             lastActivity?.ToLocalTime().ToString("HH:mm:ss") ?? "-",
             (snapshot?.DownloadBytesPerSecond ?? 0) +
-            (snapshot?.UploadBytesPerSecond ?? 0));
+            (snapshot?.UploadBytesPerSecond ?? 0),
+            configuredRule?.DownloadKiloBytesPerSecond ?? 0,
+            configuredRule?.UploadKiloBytesPerSecond ?? 0,
+            rule => ruleChanged?.Invoke(macKey, serviceId, rule));
     }
 
     public static string FormatBytes(long byteCount) => byteCount switch

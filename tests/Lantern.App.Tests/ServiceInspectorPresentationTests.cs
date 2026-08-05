@@ -1,6 +1,7 @@
 using Lantern.App.ViewModels;
 using Lantern.Core.Services;
 using Lantern.Core.Settings;
+using Lantern.Core.Control;
 using Xunit;
 
 namespace Lantern.App.Tests;
@@ -176,5 +177,43 @@ public sealed class ServiceInspectorPresentationTests
 
         Assert.Equal("42m 00s", service.DurationText);
         Assert.Equal("Idle", service.StatusText);
+    }
+
+    [Fact]
+    public void Build_IncludesFullCatalogForKnownDeviceAndAppliesServiceRuleEdits()
+    {
+        const string mac = "0E4F69CCE4F0";
+        var now = DateTimeOffset.Parse("2026-08-05T12:00:00Z");
+        var identities = new Dictionary<string, ServiceDeviceIdentity>
+        {
+            [mac] = new("POCO-F6", "192.168.31.213"),
+        };
+        var limits = new Dictionary<string, Dictionary<string, ServiceTrafficRule>>
+        {
+            [mac] = new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["youtube"] = new(1_000, 0),
+            },
+        };
+        (string Mac, string Service, ServiceTrafficRule Rule)? changed = null;
+
+        var group = Assert.Single(ServiceInspectorPresentationBuilder.Build(
+            [],
+            identities,
+            new ServiceUsageHistory(),
+            now,
+            new HashSet<string>(),
+            limits,
+            (changedMac, serviceId, rule) => changed = (changedMac, serviceId, rule)));
+
+        Assert.Equal(ServiceDefinitionCatalog.All.Count, group.Services.Count);
+        var youtube = group.Services[0];
+        Assert.Equal("youtube", youtube.ServiceId);
+        Assert.True(youtube.IsConfigured);
+        Assert.Equal(1_000, youtube.DownloadLimit);
+
+        youtube.UploadLimit = 250;
+
+        Assert.Equal((mac, "youtube", new ServiceTrafficRule(1_000, 250)), changed);
     }
 }

@@ -1238,7 +1238,7 @@
                                            FontSize="24"
                                            FontWeight="Bold" />
                                 <TextBlock Margin="0,5,0,0"
-                                           Text="See which services each device is using and how much traffic each session consumes."
+                                           Text="See service activity and apply per-service bandwidth limits inside each device's total limit."
                                            Foreground="{StaticResource SecondaryText}"
                                            FontSize="12" />
                             </StackPanel>
@@ -1256,12 +1256,12 @@
                                         Margin="32"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center">
-                                <TextBlock Text="No service activity yet"
+                                <TextBlock Text="No devices yet"
                                            HorizontalAlignment="Center"
                                            FontSize="15"
                                            FontWeight="SemiBold" />
                                 <TextBlock Margin="0,5,0,0"
-                                           Text="Start control and use a connected device. Recognized services will appear here."
+                                           Text="Start control to discover devices and configure their service limits."
                                            Foreground="{StaticResource SecondaryText}"
                                            TextAlignment="Center" />
                             </StackPanel>
@@ -1308,6 +1308,8 @@
                                                                         <ColumnDefinition Width=".85*" />
                                                                         <ColumnDefinition Width="1.05*" />
                                                                         <ColumnDefinition Width="1.05*" />
+                                                                        <ColumnDefinition Width=".9*" />
+                                                                        <ColumnDefinition Width=".9*" />
                                                                     </Grid.ColumnDefinitions>
                                                                     <StackPanel>
                                                                         <TextBlock Text="{Binding ServiceName}" FontWeight="SemiBold" />
@@ -1336,6 +1338,22 @@
                                                                     <StackPanel Grid.Column="6">
                                                                         <TextBlock Text="ACTIVITY" Foreground="{StaticResource SecondaryText}" FontSize="9" />
                                                                         <TextBlock Margin="0,4,0,0"><Run Text="{Binding FirstSeenText}"/><Run Text=" → "/><Run Text="{Binding LastActivityText}"/></TextBlock>
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="7" Margin="8,0,0,0">
+                                                                        <TextBlock Text="DOWN LIMIT" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBox Margin="0,4,0,0"
+                                                                                 MinWidth="76"
+                                                                                 Padding="7,4"
+                                                                                 Text="{Binding DownloadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}"
+                                                                                 ToolTip="Download limit in KB/s; 0 means unlimited" />
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="8" Margin="8,0,0,0">
+                                                                        <TextBlock Text="UP LIMIT" Foreground="{StaticResource SecondaryText}" FontSize="9" />
+                                                                        <TextBox Margin="0,4,0,0"
+                                                                                 MinWidth="76"
+                                                                                 Padding="7,4"
+                                                                                 Text="{Binding UploadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}"
+                                                                                 ToolTip="Upload limit in KB/s; 0 means unlimited" />
                                                                     </StackPanel>
                                                                 </Grid>
                                                             </Border>

@@ -426,6 +426,7 @@ public partial class MainWindow : Window
 
     private void ApplyAllSavedRules()
     {
+        policy.SetSafeMode(settings.SafeModeEnabled);
         foreach (var pair in settings.Devices)
         {
             policy.SetRule(
@@ -439,6 +440,14 @@ public partial class MainWindow : Window
         foreach (var pair in settings.BlockedDomains)
         {
             policy.SetBlockedDomains(pair.Key, pair.Value);
+        }
+
+        foreach (var deviceRules in settings.ServiceLimits)
+        {
+            foreach (var serviceRule in deviceRules.Value)
+            {
+                policy.SetServiceRule(deviceRules.Key, serviceRule.Key, serviceRule.Value);
+            }
         }
     }
 
@@ -839,7 +848,10 @@ public partial class MainWindow : Window
             identities,
             serviceHistory,
             now,
-            expanded);
+            expanded,
+            settings.ServiceLimits,
+            (macKey, serviceId, rule) =>
+                _ = OnServiceRuleChangedAsync(macKey, serviceId, rule));
         ServiceDeviceGroups.Clear();
         foreach (var group in groups)
         {
@@ -853,6 +865,50 @@ public partial class MainWindow : Window
             $"{groups.Count} device{(groups.Count == 1 ? string.Empty : "s")}  •  " +
             $"{serviceCount} service{(serviceCount == 1 ? string.Empty : "s")}";
         _ = PersistCompletedServiceSessionsAsync(now);
+    }
+
+    private async Task OnServiceRuleChangedAsync(
+        string macKey,
+        string serviceId,
+        ServiceTrafficRule rule)
+    {
+        try
+        {
+            if (rule.IsUnlimited)
+            {
+                if (settings.ServiceLimits.TryGetValue(macKey, out var existing))
+                {
+                    existing.Remove(serviceId);
+                    if (existing.Count == 0)
+                    {
+                        settings.ServiceLimits.Remove(macKey);
+                    }
+                }
+            }
+            else
+            {
+                if (!settings.ServiceLimits.TryGetValue(macKey, out var serviceRules))
+                {
+                    serviceRules = new Dictionary<string, ServiceTrafficRule>(
+                        StringComparer.OrdinalIgnoreCase);
+                    settings.ServiceLimits[macKey] = serviceRules;
+                }
+
+                serviceRules[serviceId] = rule.Normalize();
+            }
+
+            await engine.ApplyServiceRuleAsync(macKey, serviceId, rule);
+            await settingsStore.SaveAsync(settings);
+            Dispatcher.UIThread.Post(() => SetStatus(
+                rule.IsUnlimited
+                    ? $"{serviceId} limit removed."
+                    : $"{serviceId} limit applied."));
+        }
+        catch (Exception exception)
+        {
+            Dispatcher.UIThread.Post(() =>
+                SetStatus($"Could not apply service limit: {exception.Message}"));
+        }
     }
 
     private async Task PersistCompletedServiceSessionsAsync(DateTimeOffset now)
