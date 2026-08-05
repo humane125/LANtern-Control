@@ -173,8 +173,9 @@ public sealed class PcapLanEngine : IAsyncDisposable
             backgroundTask = Task.WhenAll(
                 forwardingTask,
                 RunMaintenanceAsync(engineCancellation.Token));
-            const string activeMessage =
-                "Live monitoring active — 0 KB/s is unlimited and remains visible.";
+            var activeMessage = policy.SafeModeEnabled
+                ? "Safe Mode active — unrestricted devices use the router directly."
+                : "Live monitoring active — 0 KB/s is unlimited and remains visible.";
             RaiseStatus(activeMessage);
             RaiseStateChanged(true, activeMessage);
         }

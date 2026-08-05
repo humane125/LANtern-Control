@@ -201,8 +201,9 @@ public sealed class LinuxLanEngine : IAsyncDisposable
             backgroundTask = Task.WhenAll(
                 forwardingTask,
                 RunMaintenanceAsync(engineCancellation.Token));
-            const string activeMessage =
-                "Linux control active - live traffic is routed through this computer.";
+            var activeMessage = policy.SafeModeEnabled
+                ? "Linux Safe Mode active - unrestricted devices use the router directly."
+                : "Linux control active - live traffic is routed through this computer.";
             RaiseStatus(activeMessage);
             RaiseStateChanged(true, activeMessage);
         }

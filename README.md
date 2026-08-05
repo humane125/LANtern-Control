@@ -34,6 +34,10 @@ use case.
 - Display live per-device download and upload speeds.
 - Keep a ten-minute network activity chart with 2.5-second samples.
 - Apply independent download and upload limits in `KB/s`.
+- Apply per-device, per-service download and upload limits from Service
+  Inspector. Service limits operate inside the device-wide maximum.
+- Use Safe Mode to discover every device while forwarding traffic only for
+  devices with active limits, pause controls, or domain rules.
 - Pause and restore a device's IPv4 internet connection.
 - Observe domains through DNS queries, TLS server names, and plain HTTP host
   headers without decrypting private HTTPS content.
@@ -146,12 +150,21 @@ disconnecting the selected adapter, suspending, or rebooting.
 3. Click **Start control** and wait for connected devices to appear.
 4. Click **Refresh devices** when you want to run a fresh discovery scan.
 5. Enter a download or upload limit in `KB/s`. A value of `0` means unlimited.
-6. Use the **Internet** switch to pause or restore a device's connection.
-7. Open **Visited domains** to inspect the destination domains LANtern can
+6. Open **Service Inspector** to set independent download and upload limits for
+   catalog services such as YouTube, Netflix, Discord, and Spotify. These limits
+   remain inside the device-wide maximum. For example, a device capped at
+   `2000 KB/s` with YouTube capped at `1000 KB/s` never exceeds `2000 KB/s`
+   total; while YouTube uses `1000 KB/s`, other apps share the remaining
+   `1000 KB/s`.
+7. Enable **Safe Mode** to leave unrestricted devices on their normal direct
+   router path. A Wi-Fi-only recommendation explains this option on launch and
+   can be permanently dismissed with **Don't ask again**.
+8. Use the **Internet** switch to pause or restore a device's connection.
+9. Open **Visited domains** to inspect the destination domains LANtern can
    observe for each device.
-8. Add individual domain rules or use a service preset to block domains for a
+10. Add individual domain rules or use a service preset to block domains for a
    selected device.
-9. Click **Stop & restore** before changing adapters, leaving the network, or
+11. Click **Stop & restore** before changing adapters, leaving the network, or
    shutting down the controller computer.
 
 Settings, saved device identities, and rules are stored locally in:
@@ -182,6 +195,26 @@ The following can hide domains or bypass domain-based rules:
 - TLS Encrypted Client Hello (ECH).
 - QUIC/HTTP3 and cached or already-open connections.
 - Applications that use direct IP addresses or frequently changing domains.
+
+The same visibility limits apply to per-service bandwidth rules. Traffic that
+cannot be classified still obeys its device-wide limit, but it cannot be charged
+to a named service limit.
+
+## Safe Mode
+
+Safe Mode separates device discovery from traffic interception. LANtern keeps
+unrestricted devices visible through ordinary ARP discovery and periodic ARP
+checks without changing their client or gateway mappings. Their traffic travels
+directly through the router.
+
+A device is forwarded through LANtern when it has any device bandwidth limit,
+service bandwidth limit, internet pause, or blocked-domain rule. Changing Safe
+Mode or adding/removing the final rule applies immediately and sends corrective
+ARP mappings when a device returns to its direct router path.
+
+Because unrestricted Safe Mode devices bypass LANtern, their live bandwidth,
+visited domains, and Service Inspector activity cannot be measured reliably.
+Their presence, saved name, IP address, and configured rules remain visible.
 
 ## Network compatibility
 

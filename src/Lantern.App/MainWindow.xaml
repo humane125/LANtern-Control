@@ -1911,7 +1911,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBox x:Name="LimitEditor"
                                                                  Style="{StaticResource CompactLimitTextBoxStyle}"
-                                                                  ToolTip="0 means unlimited; live two-way monitoring remains active"
+                                                                  ToolTip="0 means unlimited; Safe Mode bypasses devices without active rules"
                                                                  Text="{Binding DownloadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}" />
                                                         <Border Grid.Column="1"
                                                                 Margin="0,7"
@@ -1942,7 +1942,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBox x:Name="LimitEditor"
                                                                  Style="{StaticResource CompactLimitTextBoxStyle}"
-                                                                  ToolTip="0 means unlimited; live two-way monitoring remains active"
+                                                                  ToolTip="0 means unlimited; Safe Mode bypasses devices without active rules"
                                                                  Text="{Binding UploadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}" />
                                                         <Border Grid.Column="1"
                                                                 Margin="0,7"
