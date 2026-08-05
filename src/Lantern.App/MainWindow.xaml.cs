@@ -54,6 +54,8 @@ public partial class MainWindow : Window
     private bool safeModeUiReady;
     private bool wifiPromptShown;
     private bool serviceLimitEditorFocused;
+    private AdapterProfile? activeControlProfile;
+    private int networkChangeHandling;
 
     public string VersionText =>
         $"v{(typeof(MainWindow).Assembly.GetName().Version ?? new Version()).ToString(3)}";
@@ -211,6 +213,7 @@ public partial class MainWindow : Window
             ApplyAllSavedRules();
             UpdateKnownDeviceHints();
             await engine.StartAsync(selected, CancellationToken.None);
+            activeControlProfile = selected;
             controlStartedAt = DateTimeOffset.UtcNow;
             TrafficChart.Samples = trafficHistory.Samples;
             RefreshDevices(null, EventArgs.Empty);
@@ -867,6 +870,15 @@ public partial class MainWindow : Window
 
     private void RefreshDevices(object? sender, EventArgs eventArgs)
     {
+        if (engine.IsRunning &&
+            activeControlProfile is not null &&
+            !operationInProgress &&
+            HasActiveNetworkChanged(activeControlProfile))
+        {
+            _ = HandleActiveNetworkChangeAsync();
+            return;
+        }
+
         var activeProfile = AdapterSelector.SelectedItem as AdapterProfile;
         var now = DateTimeOffset.UtcNow;
         var view = CollectionViewSource.GetDefaultView(Devices);
@@ -952,6 +964,59 @@ public partial class MainWindow : Window
         RefreshDashboardSummary();
         EmptyState.Visibility = Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DeviceCountText.Text = $"{Devices.Count} device{(Devices.Count == 1 ? string.Empty : "s")}";
+    }
+
+    private static bool HasActiveNetworkChanged(AdapterProfile activeProfile)
+    {
+        try
+        {
+            return AdapterNetworkChangeDetector.HasChanged(
+                activeProfile,
+                WindowsAdapterService.GetUsableAdapters());
+        }
+        catch (Exception exception) when (
+            exception is NetworkInformationException or InvalidOperationException)
+        {
+            // An adapter disappearing during enumeration is itself a network change.
+            return true;
+        }
+    }
+
+    private async Task HandleActiveNetworkChangeAsync()
+    {
+        if (Interlocked.Exchange(ref networkChangeHandling, 1) != 0)
+        {
+            return;
+        }
+
+        activeControlProfile = null;
+        refreshTimer.Stop();
+        try
+        {
+            DetailStatusText.Text =
+                "Network changed. Restoring the previous LAN and stopping controlâ€¦";
+            await StopEngineAsync();
+
+            var adapters = WindowsAdapterService.GetUsableAdapters();
+            AdapterSelector.ItemsSource = adapters;
+            AdapterSelector.SelectedIndex = adapters.Count > 0 ? 0 : -1;
+            UpdateAdapterSummary();
+            SetStatus("Network changed â€” control stopped", false);
+            DetailStatusText.Text = adapters.Count > 0
+                ? "The adapter or Wi-Fi network changed. Review the selected adapter, then press Start."
+                : "The previous network disconnected. Connect to Wi-Fi or Ethernet, then restart LANtern.";
+        }
+        catch (Exception exception)
+        {
+            SetStatus("Network changed â€” control stopped", false);
+            DetailStatusText.Text =
+                $"LANtern stopped after the network changed: {exception.Message}";
+        }
+        finally
+        {
+            Volatile.Write(ref networkChangeHandling, 0);
+            UpdateButtons();
+        }
     }
 
     private async Task OnDeviceRuleChangedAsync(DeviceViewModel device)

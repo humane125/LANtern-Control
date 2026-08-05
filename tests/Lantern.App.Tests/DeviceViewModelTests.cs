@@ -36,56 +36,6 @@ public sealed class DeviceViewModelTests
     }
 
     [Fact]
-    public void SafeModePrompt_PreferenceChipDoesNotOverlapActionButtons()
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                var app = System.Windows.Application.Current as App ?? new App();
-                if (app.Resources.Count == 0)
-                {
-                    app.InitializeComponent();
-                }
-
-                var window = new SafeModePromptWindow();
-                var root = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
-                root.Measure(new System.Windows.Size(window.Width, window.Height));
-                root.Arrange(new Rect(0, 0, window.Width, window.Height));
-                root.UpdateLayout();
-
-                var preference = Assert.IsType<CheckBox>(
-                    window.FindName("DontAskAgainCheckBox"));
-                var preferenceBounds = preference
-                    .TransformToAncestor(root)
-                    .TransformBounds(new Rect(preference.RenderSize));
-                var firstActionTop = VisualDescendants<Button>(root)
-                    .Select(button => button
-                        .TransformToAncestor(root)
-                        .TransformBounds(new Rect(button.RenderSize)).Top)
-                    .Min();
-
-                Assert.True(
-                    preferenceBounds.Bottom + 16 <= firstActionTop,
-                    $"Preference chip bottom {preferenceBounds.Bottom:F1} overlaps action row top {firstActionTop:F1}.");
-            }
-            catch (Exception exception)
-            {
-                failure = exception;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (failure is not null)
-        {
-            throw failure;
-        }
-    }
-
-    [Fact]
     public void ApplicationIcon_ContainsWindowsIconFramesForSmallAndLargeSizes()
     {
         var iconPath = Path.Combine(
@@ -498,6 +448,25 @@ public sealed class DeviceViewModelTests
                     Assert.False(refreshTimer.IsEnabled);
                     Assert.Equal(Visibility.Visible, Assert.IsType<Button>(window.FindName("StartButton")).Visibility);
                     Assert.Equal(Visibility.Collapsed, Assert.IsType<Button>(window.FindName("StopButton")).Visibility);
+
+                    var prompt = new SafeModePromptWindow();
+                    var promptRoot = Assert.IsAssignableFrom<FrameworkElement>(prompt.Content);
+                    promptRoot.Measure(new System.Windows.Size(prompt.Width, prompt.Height));
+                    promptRoot.Arrange(new Rect(0, 0, prompt.Width, prompt.Height));
+                    promptRoot.UpdateLayout();
+                    var preference = Assert.IsType<CheckBox>(
+                        prompt.FindName("DontAskAgainCheckBox"));
+                    var preferenceBounds = preference
+                        .TransformToAncestor(promptRoot)
+                        .TransformBounds(new Rect(preference.RenderSize));
+                    var firstActionTop = VisualDescendants<Button>(promptRoot)
+                        .Select(button => button
+                            .TransformToAncestor(promptRoot)
+                            .TransformBounds(new Rect(button.RenderSize)).Top)
+                        .Min();
+                    Assert.True(
+                        preferenceBounds.Bottom + 16 <= firstActionTop,
+                        $"Preference chip bottom {preferenceBounds.Bottom:F1} overlaps action row top {firstActionTop:F1}.");
 
                     window.Close();
                 }
