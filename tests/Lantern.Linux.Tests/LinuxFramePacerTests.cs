@@ -113,6 +113,67 @@ public sealed class LinuxFramePacerTests
     }
 
     [Fact]
+    public async Task ServiceBacklog_DoesNotBlockOtherTrafficFromRemainingDeviceCapacity()
+    {
+        var sent = new ConcurrentQueue<byte>();
+        var firstServiceFrameSent = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var serviceDelayStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var otherTrafficSent = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseServiceDelay = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var clock = new ManualClock();
+        var policy = new TrafficPolicy();
+        policy.SetRule(ClientMac.ToString(), new TrafficRule(false, 0, 2));
+        policy.SetServiceRule(
+            ClientMac.ToString(),
+            "youtube",
+            new ServiceTrafficRule(0, 1));
+        await using var pacer = new LinuxFramePacer(
+            policy,
+            frame =>
+            {
+                sent.Enqueue(frame[0]);
+                if (frame[0] == 1)
+                {
+                    firstServiceFrameSent.TrySetResult();
+                }
+                else if (frame[0] == 9)
+                {
+                    otherTrafficSent.TrySetResult();
+                }
+            },
+            clock.Read,
+            async (delay, cancellationToken) =>
+            {
+                if (delay.TotalSeconds > 0.75)
+                {
+                    serviceDelayStarted.TrySetResult();
+                    await releaseServiceDelay.Task.WaitAsync(cancellationToken);
+                }
+                else
+                {
+                    clock.Advance(delay.TotalSeconds);
+                }
+            });
+
+        Assert.True(pacer.TryEnqueue(
+            ClientMac, "youtube", TrafficDirection.Upload, MarkedFrame(1)));
+        await firstServiceFrameSent.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(pacer.TryEnqueue(
+            ClientMac, "youtube", TrafficDirection.Upload, MarkedFrame(2)));
+        await serviceDelayStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(pacer.TryEnqueue(
+            ClientMac, null, TrafficDirection.Upload, MarkedFrame(9)));
+
+        await otherTrafficSent.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(new byte[] { 1, 9 }, sent);
+        releaseServiceDelay.TrySetResult();
+    }
+
+    [Fact]
     public async Task LimitedQueue_RejectsADeepBurstBeforeItCreatesTcpTimeouts()
     {
         var policy = new TrafficPolicy();
@@ -180,5 +241,12 @@ public sealed class LinuxFramePacerTests
             var current = Volatile.Read(ref seconds);
             Volatile.Write(ref seconds, current + value);
         }
+    }
+
+    private static byte[] MarkedFrame(byte marker)
+    {
+        var frame = new byte[1_000];
+        frame[0] = marker;
+        return frame;
     }
 }

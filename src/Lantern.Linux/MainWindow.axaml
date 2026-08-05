@@ -832,12 +832,16 @@
                                     <StackPanel Grid.Column="7">
                                       <TextBlock Text="DOWN LIMIT" Classes="eyebrow" Foreground="#A89095" />
                                       <TextBox Margin="0,4,0,0" MinWidth="76"
+                                               GotFocus="ServiceLimitEditor_OnGotFocus"
+                                               LostFocus="ServiceLimitEditor_OnLostFocus"
                                                Text="{Binding DownloadLimit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NonNegativeIntegerConverter}}"
                                                Watermark="KB/s" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="8">
                                       <TextBlock Text="UP LIMIT" Classes="eyebrow" Foreground="#A89095" />
                                       <TextBox Margin="0,4,0,0" MinWidth="76"
+                                               GotFocus="ServiceLimitEditor_OnGotFocus"
+                                               LostFocus="ServiceLimitEditor_OnLostFocus"
                                                Text="{Binding UploadLimit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NonNegativeIntegerConverter}}"
                                                Watermark="KB/s" />
                                     </StackPanel>

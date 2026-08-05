@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private readonly ServiceUsageHistoryStore serviceHistoryStore = new();
     private readonly SemaphoreSlim identitySaveSync = new(1, 1);
     private readonly SemaphoreSlim serviceHistorySaveSync = new(1, 1);
+    private readonly SemaphoreSlim safeModeChangeSync = new(1, 1);
     private readonly DispatcherTimer refreshTimer;
     private readonly Dictionary<string, DeviceViewModel> deviceIndex =
         new(StringComparer.OrdinalIgnoreCase);
@@ -52,6 +53,7 @@ public partial class MainWindow : Window
     private bool settingsDirty;
     private bool safeModeUiReady;
     private bool wifiPromptShown;
+    private bool serviceLimitEditorFocused;
 
     public string VersionText =>
         $"v{(typeof(MainWindow).Assembly.GetName().Version ?? new Version()).ToString(3)}";
@@ -750,12 +752,46 @@ public partial class MainWindow : Window
 
     private async Task ApplySafeModeSettingAsync(bool enabled)
     {
-        settings.SafeModeEnabled = enabled;
-        await engine.ApplySafeModeAsync(enabled);
-        await settingsStore.SaveAsync(settings);
-        DetailStatusText.Text = enabled
-            ? "Safe Mode active: unrestricted devices use the router directly."
-            : "Safe Mode off: all controllable devices are monitored through LANtern.";
+        await safeModeChangeSync.WaitAsync();
+        var previous = settings.SafeModeEnabled;
+        try
+        {
+            if (enabled == previous)
+            {
+                return;
+            }
+
+            await engine.ApplySafeModeAsync(enabled);
+            settings.SafeModeEnabled = enabled;
+            await settingsStore.SaveAsync(settings);
+            DetailStatusText.Text = enabled
+                ? "Safe Mode active: unrestricted devices use the router directly."
+                : "Safe Mode off: all controllable devices are monitored through LANtern.";
+        }
+        catch (Exception exception)
+        {
+            settings.SafeModeEnabled = previous;
+            string? rollbackFailure = null;
+            try
+            {
+                await engine.ApplySafeModeAsync(previous);
+                await settingsStore.SaveAsync(settings);
+            }
+            catch (Exception rollbackException)
+            {
+                rollbackFailure = $" Rollback also failed: {rollbackException.Message}";
+            }
+
+            safeModeUiReady = false;
+            SafeModeToggle.IsChecked = previous;
+            safeModeUiReady = true;
+            DetailStatusText.Text =
+                $"Could not change Safe Mode: {exception.Message}.{rollbackFailure}";
+        }
+        finally
+        {
+            safeModeChangeSync.Release();
+        }
     }
 
     private async Task MaybeShowWifiSafeModePromptAsync()
@@ -788,7 +824,15 @@ public partial class MainWindow : Window
         }
         else if (prompt.SuppressFuturePrompts)
         {
-            await settingsStore.SaveAsync(settings);
+            try
+            {
+                await settingsStore.SaveAsync(settings);
+            }
+            catch (Exception exception)
+            {
+                DetailStatusText.Text =
+                    $"Could not save the Wi-Fi prompt preference: {exception.Message}";
+            }
         }
     }
 
@@ -1200,6 +1244,12 @@ public partial class MainWindow : Window
 
     private void RefreshServiceInspector(DateTimeOffset now)
     {
+        if (serviceLimitEditorFocused)
+        {
+            _ = PersistCompletedServiceSessionsAsync(now);
+            return;
+        }
+
         var expanded = ServiceDeviceGroups
             .Where(group => group.IsExpanded)
             .Select(group => group.MacKey)
@@ -1238,6 +1288,12 @@ public partial class MainWindow : Window
             $"{serviceCount} service{(serviceCount == 1 ? string.Empty : "s")}";
         _ = PersistCompletedServiceSessionsAsync(now);
     }
+
+    private void ServiceLimitEditor_OnGotFocus(object sender, RoutedEventArgs eventArgs) =>
+        serviceLimitEditorFocused = true;
+
+    private void ServiceLimitEditor_OnLostFocus(object sender, RoutedEventArgs eventArgs) =>
+        serviceLimitEditorFocused = false;
 
     private async Task OnServiceRuleChangedAsync(
         string macKey,

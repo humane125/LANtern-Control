@@ -19,6 +19,7 @@ public sealed class LinuxFramePacer : IAsyncDisposable
     private readonly int queueCapacity;
     private readonly CancellationTokenSource cancellation = new();
     private readonly ConcurrentDictionary<QueueKey, Lazy<FrameQueue>> queues = [];
+    private readonly ConcurrentDictionary<DeviceQueueKey, DeviceSchedule> deviceSchedules = [];
     private int disposed;
 
     public LinuxFramePacer(
@@ -67,16 +68,20 @@ public sealed class LinuxFramePacer : IAsyncDisposable
             return false;
         }
 
+        var normalizedServiceId = string.IsNullOrWhiteSpace(serviceId)
+            ? null
+            : serviceId.Trim().ToLowerInvariant();
         var key = new QueueKey(
             TrafficPolicy.NormalizeMac(clientMac.ToString()),
-            direction);
+            direction,
+            normalizedServiceId);
         var queue = queues.GetOrAdd(
             key,
             value => new Lazy<FrameQueue>(
                 () => new FrameQueue(this, value),
                 LazyThreadSafetyMode.ExecutionAndPublication)).Value;
         var rule = policy.GetRule(key.ClientMac);
-        var serviceRule = policy.GetServiceRuleForTraffic(key.ClientMac, serviceId);
+        var serviceRule = policy.GetServiceRuleForTraffic(key.ClientMac, key.ServiceId);
         var deviceRate = key.Direction == TrafficDirection.Download
             ? rule.DownloadKiloBytesPerSecond
             : rule.UploadKiloBytesPerSecond;
@@ -88,7 +93,7 @@ public sealed class LinuxFramePacer : IAsyncDisposable
         var maximumQueuedBytes = effectiveRate <= 0
             ? (long)UnlimitedQueueBytes
             : Math.Max((long)MinimumLimitedQueueBytes, effectiveRate * 250L);
-        return queue.TryWrite(new QueuedFrame(serviceId, frame), maximumQueuedBytes);
+        return queue.TryWrite(new QueuedFrame(frame), maximumQueuedBytes);
     }
 
     public async Task ResetAsync(PhysicalAddress clientMac)
@@ -96,13 +101,21 @@ public sealed class LinuxFramePacer : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(clientMac);
         var normalized = TrafficPolicy.NormalizeMac(clientMac.ToString());
         var removed = new List<FrameQueue>();
-        foreach (var direction in Enum.GetValues<TrafficDirection>())
+        foreach (var entry in queues.Where(entry =>
+                     entry.Key.ClientMac.Equals(normalized, StringComparison.OrdinalIgnoreCase)))
         {
-            if (queues.TryRemove(new QueueKey(normalized, direction), out var lazyQueue) &&
+            if (queues.TryRemove(entry.Key, out var lazyQueue) &&
                 lazyQueue.IsValueCreated)
             {
                 removed.Add(lazyQueue.Value);
             }
+        }
+
+        foreach (var direction in Enum.GetValues<TrafficDirection>())
+        {
+            deviceSchedules.TryRemove(
+                new DeviceQueueKey(normalized, direction),
+                out _);
         }
 
         await Task.WhenAll(removed.Select(queue => queue.StopAsync()));
@@ -131,10 +144,11 @@ public sealed class LinuxFramePacer : IAsyncDisposable
         FrameQueue queue,
         CancellationToken cancellationToken)
     {
-        var nextSendAt = clockSeconds();
-        var previousRate = -1;
-        var serviceSchedules = new Dictionary<string, ServiceSchedule>(
-            StringComparer.OrdinalIgnoreCase);
+        var nextServiceSendAt = clockSeconds();
+        var previousServiceRate = -1;
+        var deviceSchedule = deviceSchedules.GetOrAdd(
+            new DeviceQueueKey(key.ClientMac, key.Direction),
+            _ => new DeviceSchedule(clockSeconds()));
         try
         {
             await foreach (var queued in reader.ReadAllAsync(cancellationToken))
@@ -150,70 +164,88 @@ public sealed class LinuxFramePacer : IAsyncDisposable
 
                     var serviceRule = policy.GetServiceRuleForTraffic(
                         key.ClientMac,
-                        queued.ServiceId);
-                    var deviceRate = key.Direction == TrafficDirection.Download
-                        ? rule.DownloadKiloBytesPerSecond
-                        : rule.UploadKiloBytesPerSecond;
+                        key.ServiceId);
                     var serviceRate = key.Direction == TrafficDirection.Download
                         ? serviceRule.DownloadKiloBytesPerSecond
                         : serviceRule.UploadKiloBytesPerSecond;
                     var now = clockSeconds();
-                    if (deviceRate <= 0)
+                    if (serviceRate <= 0)
                     {
-                        previousRate = 0;
-                        nextSendAt = now;
+                        previousServiceRate = 0;
+                        nextServiceSendAt = now;
                     }
-                    else
+                    else if (serviceRate != previousServiceRate)
                     {
-                        if (deviceRate != previousRate)
-                        {
-                            previousRate = deviceRate;
-                            nextSendAt = now;
-                        }
+                        previousServiceRate = serviceRate;
+                        nextServiceSendAt = now;
                     }
 
-                    ServiceSchedule? serviceSchedule = null;
-                    if (serviceRate > 0 && !string.IsNullOrWhiteSpace(queued.ServiceId))
-                    {
-                        if (!serviceSchedules.TryGetValue(
-                                queued.ServiceId,
-                                out serviceSchedule) ||
-                            serviceSchedule.Rate != serviceRate)
-                        {
-                            serviceSchedule = new ServiceSchedule(serviceRate, now);
-                            serviceSchedules[queued.ServiceId] = serviceSchedule;
-                        }
-                    }
-
-                    var scheduledAt = Math.Max(
-                        deviceRate > 0 ? nextSendAt : now,
-                        serviceSchedule?.NextSendAt ?? now);
-                    if (scheduledAt > now)
+                    if (serviceRate > 0 && nextServiceSendAt > now)
                     {
                         await delayAsync(
-                            TimeSpan.FromSeconds(scheduledAt - now),
+                            TimeSpan.FromSeconds(nextServiceSendAt - now),
                             cancellationToken);
                     }
 
-                    rule = policy.GetRule(key.ClientMac);
-                    if (rule.PauseInternet)
+                    await deviceSchedule.Gate.WaitAsync(cancellationToken);
+                    try
                     {
-                        frameDropped();
-                        continue;
-                    }
+                        rule = policy.GetRule(key.ClientMac);
+                        if (rule.PauseInternet)
+                        {
+                            frameDropped();
+                            continue;
+                        }
 
-                    sendFrame(queued.Frame);
-                    var scheduleBase = Math.Max(scheduledAt, clockSeconds() - 0.05D);
-                    if (deviceRate > 0)
-                    {
-                        nextSendAt = scheduleBase +
-                            (queued.Frame.Length / (deviceRate * 1_000D));
-                    }
+                        var deviceRate = key.Direction == TrafficDirection.Download
+                            ? rule.DownloadKiloBytesPerSecond
+                            : rule.UploadKiloBytesPerSecond;
+                        now = clockSeconds();
+                        if (deviceRate <= 0)
+                        {
+                            deviceSchedule.PreviousRate = 0;
+                            deviceSchedule.NextSendAt = now;
+                        }
+                        else if (deviceRate != deviceSchedule.PreviousRate)
+                        {
+                            deviceSchedule.PreviousRate = deviceRate;
+                            deviceSchedule.NextSendAt = now;
+                        }
 
-                    if (serviceSchedule is not null)
+                        var scheduledAt = deviceRate > 0
+                            ? Math.Max(deviceSchedule.NextSendAt, now)
+                            : now;
+                        if (scheduledAt > now)
+                        {
+                            await delayAsync(
+                                TimeSpan.FromSeconds(scheduledAt - now),
+                                cancellationToken);
+                        }
+
+                        rule = policy.GetRule(key.ClientMac);
+                        if (rule.PauseInternet)
+                        {
+                            frameDropped();
+                            continue;
+                        }
+
+                        sendFrame(queued.Frame);
+                        var scheduleBase = Math.Max(scheduledAt, clockSeconds() - 0.05D);
+                        if (deviceRate > 0)
+                        {
+                            deviceSchedule.NextSendAt = scheduleBase +
+                                (queued.Frame.Length / (deviceRate * 1_000D));
+                        }
+
+                        if (serviceRate > 0)
+                        {
+                            nextServiceSendAt = scheduleBase +
+                                (queued.Frame.Length / (serviceRate * 1_000D));
+                        }
+                    }
+                    finally
                     {
-                        serviceSchedule.NextSendAt = scheduleBase +
-                            (queued.Frame.Length / (serviceRate * 1_000D));
+                        deviceSchedule.Gate.Release();
                     }
                 }
                 finally
@@ -236,13 +268,20 @@ public sealed class LinuxFramePacer : IAsyncDisposable
 
     private readonly record struct QueueKey(
         string ClientMac,
+        TrafficDirection Direction,
+        string? ServiceId);
+
+    private readonly record struct DeviceQueueKey(
+        string ClientMac,
         TrafficDirection Direction);
 
-    private readonly record struct QueuedFrame(string? ServiceId, byte[] Frame);
+    private readonly record struct QueuedFrame(byte[] Frame);
 
-    private sealed class ServiceSchedule(int rate, double nextSendAt)
+    private sealed class DeviceSchedule(double nextSendAt)
     {
-        public int Rate { get; } = rate;
+        public SemaphoreSlim Gate { get; } = new(1, 1);
+
+        public int PreviousRate { get; set; } = -1;
 
         public double NextSendAt { get; set; } = nextSendAt;
     }

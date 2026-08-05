@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $publishDirectory = Join-Path $projectRoot "release"
+$outputDirectory = Join-Path $projectRoot "outputs"
 $installerProject = Join-Path $projectRoot "installer\LanternControl.wixproj"
 $installerVerification = Join-Path $projectRoot "scripts\verify-msi-installer.ps1"
 $projectFile = Join-Path $projectRoot "src\Lantern.App\Lantern.App.csproj"
@@ -40,7 +41,11 @@ if ($LASTEXITCODE -ne 0) {
 
 $publishedExe = Join-Path $publishDirectory "LANtern Control.exe"
 Write-Host "Published: $publishedExe"
-$portableArchive = Join-Path $projectRoot "outputs\LANtern-Control-v$releaseVersion-win-x64.zip"
+if (-not (Test-Path -LiteralPath $outputDirectory)) {
+    New-Item -ItemType Directory -Path $outputDirectory | Out-Null
+}
+
+$portableArchive = Join-Path $outputDirectory "LANtern-Control-v$releaseVersion-win-x64.zip"
 if (Test-Path -LiteralPath $portableArchive) {
     Remove-Item -LiteralPath $portableArchive -Force
 }
@@ -56,6 +61,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $builtInstaller = Join-Path $projectRoot "packaging\wix\LANtern-Control-Setup-v$releaseVersion.msi"
-$installer = Join-Path $projectRoot "outputs\LANtern-Control-Setup-v$releaseVersion.msi"
+$installer = Join-Path $outputDirectory "LANtern-Control-Setup-v$releaseVersion.msi"
 Copy-Item -LiteralPath $builtInstaller -Destination $installer -Force
 Write-Host "Installer: $installer"

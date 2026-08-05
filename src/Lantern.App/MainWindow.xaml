@@ -1355,6 +1355,8 @@
                                                                         <TextBox Margin="0,4,0,0"
                                                                                  MinWidth="76"
                                                                                  Padding="7,4"
+                                                                                 GotFocus="ServiceLimitEditor_OnGotFocus"
+                                                                                 LostFocus="ServiceLimitEditor_OnLostFocus"
                                                                                  Text="{Binding DownloadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}"
                                                                                  ToolTip="Download limit in KB/s; 0 means unlimited" />
                                                                     </StackPanel>
@@ -1363,6 +1365,8 @@
                                                                         <TextBox Margin="0,4,0,0"
                                                                                  MinWidth="76"
                                                                                  Padding="7,4"
+                                                                                 GotFocus="ServiceLimitEditor_OnGotFocus"
+                                                                                 LostFocus="ServiceLimitEditor_OnLostFocus"
                                                                                  Text="{Binding UploadLimit, UpdateSourceTrigger=PropertyChanged, Delay=350}"
                                                                                  ToolTip="Upload limit in KB/s; 0 means unlimited" />
                                                                     </StackPanel>
