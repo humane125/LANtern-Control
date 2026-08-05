@@ -248,6 +248,25 @@ public sealed class ServiceInspectorTrackerTests
         Assert.Empty(tracker.GetSnapshots(Start.AddSeconds(10)));
     }
 
+    [Fact]
+    public void Observe_RepeatedPacketsDoesNotAllocatePerPacketMaintenanceWork()
+    {
+        var tracker = new ServiceInspectorTracker();
+        var packet = Result(null, TrafficDirection.Download, 1_400);
+        tracker.Observe(packet, Start);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 10_000; index++)
+        {
+            tracker.Observe(packet, Start.AddMilliseconds(index % 500));
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        Assert.True(
+            allocated < 256_000,
+            $"The forwarding hot path allocated {allocated:N0} bytes for 10,000 packets.");
+    }
+
     private static FrameRouteResult Result(
         string? domain,
         TrafficDirection direction,

@@ -6,12 +6,14 @@ namespace Lantern.Core.Services;
 public sealed class ServiceInspectorTracker
 {
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan ExpirationScanInterval = TimeSpan.FromSeconds(1);
 
     private readonly object sync = new();
     private readonly Dictionary<ServiceFlowKey, FlowState> flows = [];
     private readonly Dictionary<SessionKey, SessionState> sessions = [];
     private readonly Dictionary<string, RecentServiceContext> recentServiceContexts = [];
     private readonly List<CompletedServiceSession> completed = [];
+    private DateTimeOffset nextExpirationScan = DateTimeOffset.MinValue;
 
     public void Observe(FrameRouteResult result, DateTimeOffset observedAt)
     {
@@ -20,10 +22,11 @@ public sealed class ServiceInspectorTracker
             return;
         }
 
-        var macKey = TrafficPolicy.NormalizeMac(result.ClientMac.ToString());
+        var macKey = result.Flow?.ClientMac ??
+                     TrafficPolicy.NormalizeMac(result.ClientMac.ToString());
         lock (sync)
         {
-            Expire(observedAt);
+            ExpireIfDue(observedAt);
 
             if (result.Observation is { } observation)
             {
@@ -52,7 +55,15 @@ public sealed class ServiceInspectorTracker
                         macKey,
                         result.AttributedDomain,
                         observedAt);
-                flows[flow] = new FlowState(service, observedAt);
+                if (flows.TryGetValue(flow, out var attributedFlow))
+                {
+                    attributedFlow.Service = service;
+                    attributedFlow.LastActivity = observedAt;
+                }
+                else
+                {
+                    flows[flow] = new FlowState(service, observedAt);
+                }
             }
             else if (flows.TryGetValue(flow, out var existingFlow))
             {
@@ -64,7 +75,8 @@ public sealed class ServiceInspectorTracker
                               out var reboundService)
                     ? reboundService
                     : existingFlow.Service;
-                flows[flow] = new FlowState(service, observedAt);
+                existingFlow.Service = service;
+                existingFlow.LastActivity = observedAt;
             }
             else
             {
@@ -164,7 +176,19 @@ public sealed class ServiceInspectorTracker
             sessions.Clear();
             flows.Clear();
             recentServiceContexts.Clear();
+            nextExpirationScan = DateTimeOffset.MinValue;
         }
+    }
+
+    private void ExpireIfDue(DateTimeOffset now)
+    {
+        if (now < nextExpirationScan)
+        {
+            return;
+        }
+
+        Expire(now);
+        nextExpirationScan = now + ExpirationScanInterval;
     }
 
     private ServiceDefinition ResolveService(
@@ -258,9 +282,14 @@ public sealed class ServiceInspectorTracker
         ServiceDefinition Service,
         DateTimeOffset LastActivity);
 
-    private sealed record FlowState(
-        ServiceDefinition Service,
-        DateTimeOffset LastActivity);
+    private sealed class FlowState(
+        ServiceDefinition service,
+        DateTimeOffset lastActivity)
+    {
+        public ServiceDefinition Service { get; set; } = service;
+
+        public DateTimeOffset LastActivity { get; set; } = lastActivity;
+    }
 
     private static bool IsMetaService(ServiceDefinition service) =>
         service.Id is "facebook" or "instagram" or "messenger";
