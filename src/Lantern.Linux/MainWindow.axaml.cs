@@ -54,6 +54,8 @@ public partial class MainWindow : Window
     private DateTimeOffset? startedAt;
     private bool closingAfterRestore;
     private bool busy;
+    private bool safeModeUiReady;
+    private bool wifiPromptShown;
 
     public string VersionText =>
         $"v{(typeof(MainWindow).Assembly.GetName().Version ?? new Version()).ToString(3)} beta";
@@ -100,6 +102,9 @@ public partial class MainWindow : Window
         }
 
         settings = await settingsStore.LoadAsync();
+        policy.SetSafeMode(settings.SafeModeEnabled);
+        SafeModeToggle.IsChecked = settings.SafeModeEnabled;
+        safeModeUiReady = true;
         serviceHistory = await serviceHistoryStore.LoadAsync();
         dashboardState = new LinuxDashboardState(settings, policy);
         ApplyAllSavedRules();
@@ -108,6 +113,7 @@ public partial class MainWindow : Window
         refreshTimer.Start();
         RefreshDashboard();
         UpdateButtons();
+        await MaybeShowWifiSafeModePromptAsync();
         await CheckForUpdatesAsync();
     }
 
@@ -404,17 +410,18 @@ public partial class MainWindow : Window
         try
         {
             var rule = new TrafficRule(device.PauseInternet, device.DownloadLimit, device.UploadLimit);
-            dashboardState.ApplyTrafficRule(device.MacKey, rule);
-            var preferences = settings.Devices[device.MacKey];
-            preferences.Alias = device.Alias;
-            preferences.LastKnownIp = device.IpAddress;
             if (demoMode)
             {
+                dashboardState.ApplyTrafficRule(device.MacKey, rule);
                 RefreshDemoDashboard();
                 return;
             }
 
             await engine.ApplyRuleAsync(device.MacKey, rule);
+            dashboardState.ApplyTrafficRule(device.MacKey, rule);
+            var preferences = settings.Devices[device.MacKey];
+            preferences.Alias = device.Alias;
+            preferences.LastKnownIp = device.IpAddress;
             await settingsStore.SaveAsync(settings);
             Dispatcher.UIThread.Post(RefreshDashboard);
         }
@@ -585,7 +592,9 @@ public partial class MainWindow : Window
         if (RuleDeviceSelector.SelectedItem is DeviceViewModel device &&
             PresetSelector.SelectedItem is DomainBlockPreset preset)
         {
+            var previousTargets = policy.GetInterceptionTargets(device.MacKey);
             dashboardState.ApplyPreset(device.MacKey, preset);
+            await engine.ApplyCurrentInterceptionAsync(device.MacKey, previousTargets);
             await SaveDomainRulesAsync($"{preset.Name} blocked for {device.DisplayName}.");
         }
     }
@@ -612,7 +621,9 @@ public partial class MainWindow : Window
 
     private async Task AddDomainsAsync(string macKey, IReadOnlyList<string> domains)
     {
+        var previousTargets = policy.GetInterceptionTargets(macKey);
         dashboardState.ApplyPreset(macKey, new DomainBlockPreset("Custom", domains));
+        await engine.ApplyCurrentInterceptionAsync(macKey, previousTargets);
         await SaveDomainRulesAsync($"Blocked {domains.Count} domain rule{(domains.Count == 1 ? string.Empty : "s")}.");
     }
 
@@ -623,7 +634,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        var previousTargets = policy.GetInterceptionTargets(rule.MacKey);
         dashboardState.RemoveDomain(rule.MacKey, rule.Domain);
+        await engine.ApplyCurrentInterceptionAsync(rule.MacKey, previousTargets);
         await SaveDomainRulesAsync($"Removed {rule.Domain}.");
     }
 
@@ -661,7 +674,9 @@ public partial class MainWindow : Window
             }
         }
 
+        var previousTargets = policy.GetInterceptionTargets(preset.MacKey);
         policy.SetBlockedDomains(preset.MacKey, settings.BlockedDomains.GetValueOrDefault(preset.MacKey, []));
+        await engine.ApplyCurrentInterceptionAsync(preset.MacKey, previousTargets);
         await SaveDomainRulesAsync($"Removed the {preset.PresetName} preset from {preset.DeviceName}.");
     }
 
@@ -783,7 +798,7 @@ public partial class MainWindow : Window
         UpdateEmptyStates();
     }
 
-    private void AdapterSelector_OnSelectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
+    private async void AdapterSelector_OnSelectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
     {
         if (AdapterSelector.SelectedItem is AdapterProfile adapter)
         {
@@ -797,6 +812,67 @@ public partial class MainWindow : Window
         }
 
         UpdateButtons();
+        await MaybeShowWifiSafeModePromptAsync();
+    }
+
+    private async void SafeModeToggle_OnChanged(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (!safeModeUiReady || demoMode)
+        {
+            return;
+        }
+
+        await ApplySafeModeSettingAsync(SafeModeToggle.IsChecked == true);
+    }
+
+    private async Task ApplySafeModeSettingAsync(bool enabled)
+    {
+        settings.SafeModeEnabled = enabled;
+        await engine.ApplySafeModeAsync(enabled);
+        await settingsStore.SaveAsync(settings);
+        SetStatus(enabled
+            ? "Safe Mode active: unrestricted devices use the router directly."
+            : "Safe Mode off: all controllable devices are monitored through LANtern.");
+    }
+
+    private async Task MaybeShowWifiSafeModePromptAsync()
+    {
+        if (demoMode ||
+            !safeModeUiReady ||
+            AdapterSelector.SelectedItem is not AdapterProfile adapter ||
+            !WifiSafeModePromptPolicy.ShouldPrompt(
+                adapter.ConnectionKind,
+                settings.SafeModeEnabled,
+                settings.SuppressWifiSafeModePrompt,
+                wifiPromptShown))
+        {
+            return;
+        }
+
+        wifiPromptShown = true;
+        var result = await new SafeModePromptWindow()
+            .ShowDialog<SafeModePromptResult>(this);
+        if (result is null)
+        {
+            return;
+        }
+
+        if (result.SuppressFuturePrompts)
+        {
+            settings.SuppressWifiSafeModePrompt = true;
+        }
+
+        if (result.EnableSafeMode)
+        {
+            safeModeUiReady = false;
+            SafeModeToggle.IsChecked = true;
+            safeModeUiReady = true;
+            await ApplySafeModeSettingAsync(true);
+        }
+        else if (result.SuppressFuturePrompts)
+        {
+            await settingsStore.SaveAsync(settings);
+        }
     }
 
     private void OverviewNavButton_OnClick(object? sender, RoutedEventArgs eventArgs) => ShowPage(OverviewPage, OverviewNavButton);

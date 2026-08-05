@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Lantern.Linux.Controls" x:Class="Lantern.Linux.SafeModePromptWindow"
+        Title="Wi-Fi Safe Mode" Width="570" Height="400" CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" SystemDecorations="None" TransparencyLevelHint="Transparent"
+        Background="Transparent" Foreground="#F4EEF0" FontFamily="Inter">
+  <Window.Styles>
+    <Style Selector="Button.action"><Setter Property="MinHeight" Value="38"/><Setter Property="Padding" Value="14,9"/><Setter Property="Foreground" Value="#F4EEF0"/><Setter Property="Background" Value="#171317"/><Setter Property="BorderBrush" Value="#2B2226"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="8"/></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#261014"/><Setter Property="BorderBrush" Value="#D72C43"/></Style>
+  </Window.Styles>
+  <Border Margin="18" CornerRadius="18" Background="#08090B" BorderBrush="#6E1828"
+          BorderThickness="1" BoxShadow="0 8 30 0 #A6000000">
+    <Grid RowDefinitions="42,*">
+      <Border Background="#0D0B0E" CornerRadius="18,18,0,0" BorderBrush="#2B2226"
+              BorderThickness="0,0,0,1" PointerPressed="TitleBar_OnPointerPressed">
+        <StackPanel Margin="16,0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="9">
+          <Ellipse Width="7" Height="7" Fill="#D72C43"/>
+          <TextBlock Text="LANtern Control  •  Wi-Fi protection" FontWeight="SemiBold"/>
+        </StackPanel>
+      </Border>
+      <Grid Grid.Row="1" Margin="28,24" ColumnDefinitions="112,*" RowDefinitions="*,Auto">
+        <Border Width="96" Height="96" CornerRadius="24" Background="#1B0A0F" BorderBrush="#7F1729" BorderThickness="1" VerticalAlignment="Top"><controls:RedWatcherLogo Margin="8"/></Border>
+        <StackPanel Grid.Column="1" Margin="10,2,0,0">
+          <TextBlock Text="WI-FI CONNECTION DETECTED" Foreground="#D72C43" FontSize="10" FontWeight="SemiBold"/>
+          <TextBlock Margin="0,7,0,0" Text="Keep unrestricted devices direct." FontSize="25" FontWeight="Bold" TextWrapping="Wrap"/>
+          <TextBlock Margin="0,10,0,0" Foreground="#A89095" FontSize="13" LineHeight="20" TextWrapping="Wrap" Text="Safe Mode discovers every device, but only forwards traffic for devices with a speed limit, service limit, pause, or domain rule. This reduces Wi-Fi load and latency."/>
+          <CheckBox x:Name="DontAskAgainCheckBox" Margin="0,18,0,0" Content="Don't ask again"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,24,0,0" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+          <Button Classes="action" MinWidth="110" Content="Ignore" Click="IgnoreButton_OnClick"/>
+          <Button Classes="action primary" MinWidth="170" Content="Turn on Safe Mode" Click="EnableButton_OnClick"/>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

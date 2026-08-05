@@ -482,7 +482,7 @@ public sealed class LinuxMainWindowTests
         Assert.Contains("Style Selector=\"Button.action\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"HorizontalContentAlignment\" Value=\"Center\" />", xaml, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"VerticalContentAlignment\" Value=\"Center\" />", xaml, StringComparison.Ordinal);
-        Assert.Contains("ColumnDefinitions=\"2.2*,0.8*,0.8*,Auto\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"2.2*,0.8*,0.8*,Auto,Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"1\" Margin=\"28,0,24,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"2\" Margin=\"28,0,24,0\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"AdapterSelector\" Margin=\"0,8,0,0\" MinHeight=\"48\" MinWidth=\"360\"", xaml, StringComparison.Ordinal);

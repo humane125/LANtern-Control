@@ -589,6 +589,7 @@
                             <ColumnDefinition Width="1.8*" MinWidth="280" />
                             <ColumnDefinition Width="1*" MinWidth="210" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="NETWORK ADAPTER"
@@ -645,7 +646,17 @@
                             </StackPanel>
                         </Grid>
 
-                        <StackPanel Grid.Column="2"
+                        <StackPanel Grid.Column="2" Margin="0,0,22,0" VerticalAlignment="Center">
+                            <TextBlock Text="SAFE MODE" Foreground="{StaticResource SecondaryText}"
+                                       FontSize="10" FontWeight="SemiBold" />
+                            <CheckBox x:Name="SafeModeToggle" Margin="0,8,0,0"
+                                      Style="{StaticResource SwitchCheckBoxStyle}"
+                                      Content="Rules only" Checked="SafeModeToggle_OnChanged"
+                                      Unchecked="SafeModeToggle_OnChanged"
+                                      ToolTip="Bypass LANtern for devices without enforceable rules" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3"
                                     VerticalAlignment="Center"
                                     Orientation="Horizontal">
                             <Button x:Name="StartButton"

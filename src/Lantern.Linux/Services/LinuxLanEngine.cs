@@ -321,6 +321,14 @@ public sealed class LinuxLanEngine : IAsyncDisposable
             policy.GetInterceptionTargets(macAddress));
     }
 
+    public Task ApplyCurrentInterceptionAsync(
+        string macAddress,
+        InterceptionTargets previousTargets) =>
+        ApplyRuleTransitionForClientAsync(
+            macAddress,
+            previousTargets,
+            policy.GetInterceptionTargets(macAddress));
+
     public async Task ApplySafeModeAsync(bool enabled)
     {
         var previous = clients.ToDictionary(

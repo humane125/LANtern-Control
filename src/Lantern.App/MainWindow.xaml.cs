@@ -50,6 +50,8 @@ public partial class MainWindow : Window
     private bool operationInProgress;
     private bool closeAfterStop;
     private bool settingsDirty;
+    private bool safeModeUiReady;
+    private bool wifiPromptShown;
 
     public string VersionText =>
         $"v{(typeof(MainWindow).Assembly.GetName().Version ?? new Version()).ToString(3)}";
@@ -119,6 +121,9 @@ public partial class MainWindow : Window
     private async void MainWindow_OnLoaded(object sender, RoutedEventArgs eventArgs)
     {
         settings = await settingsStore.LoadAsync();
+        policy.SetSafeMode(settings.SafeModeEnabled);
+        SafeModeToggle.IsChecked = settings.SafeModeEnabled;
+        safeModeUiReady = true;
         serviceHistory = await serviceHistoryStore.LoadAsync();
         LoadDomainRulesFromSettings();
         var adapters = WindowsAdapterService.GetUsableAdapters();
@@ -131,6 +136,7 @@ public partial class MainWindow : Window
             StartButton.IsEnabled = false;
         }
 
+        await MaybeShowWifiSafeModePromptAsync();
         await CheckForUpdatesAsync();
         RefreshServiceInspector(DateTimeOffset.UtcNow);
     }
@@ -463,7 +469,7 @@ public partial class MainWindow : Window
         }
 
         domains.Sort(StringComparer.OrdinalIgnoreCase);
-        policy.SetBlockedDomains(macKey, domains);
+        await engine.ApplyBlockedDomainsAsync(macKey, domains);
         RebuildDomainRulePresentation();
         RefreshBlockedActivityState();
         await SaveDomainRulesAsync(status);
@@ -481,7 +487,7 @@ public partial class MainWindow : Window
             }
         }
 
-        policy.SetBlockedDomains(
+        await engine.ApplyBlockedDomainsAsync(
             rule.MacKey,
             settings.BlockedDomains.TryGetValue(rule.MacKey, out var remaining)
                 ? remaining
@@ -520,7 +526,7 @@ public partial class MainWindow : Window
             }
         }
 
-        policy.SetBlockedDomains(
+        await engine.ApplyBlockedDomainsAsync(
             preset.MacKey,
             settings.BlockedDomains.GetValueOrDefault(preset.MacKey, []));
         RebuildDomainRulePresentation();
@@ -723,12 +729,67 @@ public partial class MainWindow : Window
         CollectionViewSource.GetDefaultView(DomainRules).Refresh();
     }
 
-    private void AdapterSelector_OnSelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    private async void AdapterSelector_OnSelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {
         UpdateAdapterSummary();
         StartButton.IsEnabled = !operationInProgress &&
                                 !engine.IsRunning &&
-                                AdapterSelector.SelectedItem is AdapterProfile;
+                                 AdapterSelector.SelectedItem is AdapterProfile;
+        await MaybeShowWifiSafeModePromptAsync();
+    }
+
+    private async void SafeModeToggle_OnChanged(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!safeModeUiReady)
+        {
+            return;
+        }
+
+        await ApplySafeModeSettingAsync(SafeModeToggle.IsChecked == true);
+    }
+
+    private async Task ApplySafeModeSettingAsync(bool enabled)
+    {
+        settings.SafeModeEnabled = enabled;
+        await engine.ApplySafeModeAsync(enabled);
+        await settingsStore.SaveAsync(settings);
+        DetailStatusText.Text = enabled
+            ? "Safe Mode active: unrestricted devices use the router directly."
+            : "Safe Mode off: all controllable devices are monitored through LANtern.";
+    }
+
+    private async Task MaybeShowWifiSafeModePromptAsync()
+    {
+        if (!safeModeUiReady ||
+            AdapterSelector.SelectedItem is not AdapterProfile adapter ||
+            !WifiSafeModePromptPolicy.ShouldPrompt(
+                adapter.ConnectionKind,
+                settings.SafeModeEnabled,
+                settings.SuppressWifiSafeModePrompt,
+                wifiPromptShown))
+        {
+            return;
+        }
+
+        wifiPromptShown = true;
+        var prompt = new SafeModePromptWindow { Owner = this };
+        _ = prompt.ShowDialog();
+        if (prompt.SuppressFuturePrompts)
+        {
+            settings.SuppressWifiSafeModePrompt = true;
+        }
+
+        if (prompt.EnableSafeMode)
+        {
+            safeModeUiReady = false;
+            SafeModeToggle.IsChecked = true;
+            safeModeUiReady = true;
+            await ApplySafeModeSettingAsync(true);
+        }
+        else if (prompt.SuppressFuturePrompts)
+        {
+            await settingsStore.SaveAsync(settings);
+        }
     }
 
     private async Task StopEngineAsync()
