@@ -30,6 +30,22 @@ public static class TestAppBuilder
 public sealed class LinuxMainWindowTests
 {
     [Fact]
+    public void SafeModePrompt_UsesThemedPreferenceChip()
+    {
+        var xaml = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "..",
+            "src", "Lantern.Linux", "SafeModePromptWindow.axaml"));
+
+        Assert.Contains("Style Selector=\"CheckBox.prompt-preference\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DontAskAgainCheckBox\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Remember this choice on Wi-Fi", xaml, StringComparison.Ordinal);
+        Assert.Contains("CheckBox.prompt-preference:checked", xaml, StringComparison.Ordinal);
+        Assert.Contains("CheckBox.prompt-preference:pointerover", xaml, StringComparison.Ordinal);
+        Assert.Contains("CheckBox.prompt-preference:focus-visible", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LinuxPalette_UsesTheExactWindowsColorTokens()
     {
         var appXaml = File.ReadAllText(Path.Combine(

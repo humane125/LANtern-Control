@@ -6,6 +6,83 @@
   <Window.Styles>
     <Style Selector="Button.action"><Setter Property="MinHeight" Value="38"/><Setter Property="Padding" Value="14,9"/><Setter Property="Foreground" Value="#F4EEF0"/><Setter Property="Background" Value="#171317"/><Setter Property="BorderBrush" Value="#2B2226"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="8"/></Style>
     <Style Selector="Button.primary"><Setter Property="Background" Value="#261014"/><Setter Property="BorderBrush" Value="#D72C43"/></Style>
+    <Style Selector="CheckBox.prompt-preference">
+      <Setter Property="Foreground" Value="#F4EEF0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border x:Name="PreferenceChip"
+                  Padding="11,8"
+                  Background="#100D10"
+                  BorderBrush="#3A282E"
+                  BorderThickness="1"
+                  CornerRadius="11">
+            <Grid ColumnDefinitions="24,*">
+              <Grid Width="22" Height="22" VerticalAlignment="Center">
+                <Border x:Name="SelectionGlow"
+                        Margin="2"
+                        Background="#D72C43"
+                        BoxShadow="0 0 13 0 #D72C43"
+                        CornerRadius="7"
+                        Opacity="0" />
+                <Border x:Name="SelectionBox"
+                        Background="#0B090B"
+                        BorderBrush="#70404A"
+                        BorderThickness="1"
+                        CornerRadius="7" />
+                <Path x:Name="SelectionCheck"
+                      Width="12" Height="9"
+                      Data="M 1,4 L 4.5,7.5 L 11,1"
+                      Stroke="#FFF7F8"
+                      StrokeThickness="2"
+                      StrokeLineCap="Round"
+                      StrokeJoin="Round"
+                      Stretch="Fill"
+                      IsVisible="False" />
+              </Grid>
+              <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                <TextBlock Text="Don't ask again" FontSize="12" FontWeight="SemiBold" />
+                <TextBlock Margin="0,2,0,0"
+                           Text="Remember this choice on Wi-Fi"
+                           Foreground="#A89095"
+                           FontSize="10" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:pointerover /template/ Border#PreferenceChip">
+      <Setter Property="Background" Value="#171116" />
+      <Setter Property="BorderBrush" Value="#6E2938" />
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:pointerover /template/ Border#SelectionBox">
+      <Setter Property="BorderBrush" Value="#B32941" />
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:focus-visible /template/ Border#PreferenceChip">
+      <Setter Property="BorderBrush" Value="#D72C43" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="Padding" Value="10,7" />
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:pressed /template/ Border#PreferenceChip">
+      <Setter Property="Background" Value="#211219" />
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:checked /template/ Border#PreferenceChip">
+      <Setter Property="Background" Value="#180C11" />
+      <Setter Property="BorderBrush" Value="#7F1729" />
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:checked /template/ Border#SelectionBox">
+      <Setter Property="Background" Value="#D72C43" />
+      <Setter Property="BorderBrush" Value="#F04A61" />
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:checked /template/ Border#SelectionGlow">
+      <Setter Property="Opacity" Value="0.58" />
+    </Style>
+    <Style Selector="CheckBox.prompt-preference:checked /template/ Path#SelectionCheck">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
   </Window.Styles>
   <Border Margin="18" CornerRadius="18" Background="#08090B" BorderBrush="#6E1828"
           BorderThickness="1" BoxShadow="0 8 30 0 #A6000000">
@@ -23,7 +100,11 @@
           <TextBlock Text="WI-FI CONNECTION DETECTED" Foreground="#D72C43" FontSize="10" FontWeight="SemiBold"/>
           <TextBlock Margin="0,7,0,0" Text="Keep unrestricted devices direct." FontSize="25" FontWeight="Bold" TextWrapping="Wrap"/>
           <TextBlock Margin="0,10,0,0" Foreground="#A89095" FontSize="13" LineHeight="20" TextWrapping="Wrap" Text="Safe Mode discovers every device, but only forwards traffic for devices with a speed limit, service limit, pause, or domain rule. This reduces Wi-Fi load and latency."/>
-          <CheckBox x:Name="DontAskAgainCheckBox" Margin="0,18,0,0" Content="Don't ask again"/>
+          <CheckBox x:Name="DontAskAgainCheckBox"
+                    Classes="prompt-preference"
+                    Margin="0,16,0,0"
+                    AutomationProperties.Name="Don't ask again"
+                    AutomationProperties.HelpText="Remember this choice on Wi-Fi" />
         </StackPanel>
         <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,24,0,0" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
           <Button Classes="action" MinWidth="110" Content="Ignore" Click="IgnoreButton_OnClick"/>
