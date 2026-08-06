@@ -36,6 +36,30 @@ public sealed class ForwarderStartupPolicyTests
     }
 
     [Fact]
+    public void FailedEstablishedHandle_FallsBackToSecondaryHandle()
+    {
+        var establishedCaptureHandle = new object();
+        var secondaryForwardingHandle = new object();
+        var attemptedHandles = new List<object>();
+
+        var selected = PacketInjectionPolicy.SendUsingFirstWorkingHandle(
+            [establishedCaptureHandle, secondaryForwardingHandle],
+            handle =>
+            {
+                attemptedHandles.Add(handle);
+                if (ReferenceEquals(handle, establishedCaptureHandle))
+                {
+                    throw new InvalidOperationException("Npcap error 31");
+                }
+            });
+
+        Assert.Same(secondaryForwardingHandle, selected);
+        Assert.Equal(
+            [establishedCaptureHandle, secondaryForwardingHandle],
+            attemptedHandles);
+    }
+
+    [Fact]
     public async Task FirstCaptureError_FaultsStartupWithTheDriverError()
     {
         var ready = new TaskCompletionSource(

@@ -31,6 +31,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
     private Task? backgroundTask;
     private LibPcapLiveDevice? arpDevice;
     private LibPcapLiveDevice? forwardingDevice;
+    private LibPcapLiveDevice? injectionDevice;
     private AdapterProfile? profile;
     private PhysicalAddress? gatewayMac;
     private FrameRouter? frameRouter;
@@ -442,6 +443,8 @@ public sealed class PcapLanEngine : IAsyncDisposable
                 forwardingDevice.Close();
                 forwardingDevice = null;
             }
+
+            injectionDevice = null;
 
             if (serviceInspectorPump is not null)
             {
@@ -1049,12 +1052,7 @@ public sealed class PcapLanEngine : IAsyncDisposable
 
     private void SendArpPacket(byte[] bytes)
     {
-        var activeDevice = arpDevice ??
-            throw new InvalidOperationException("The ARP capture adapter is not open.");
-        lock (arpSendSync)
-        {
-            activeDevice.SendPacket(bytes);
-        }
+        SendInjectionPacket(bytes);
     }
 
     private void SendForwardingPacket(byte[] bytes)
@@ -1063,17 +1061,13 @@ public sealed class PcapLanEngine : IAsyncDisposable
         // packet injection through it with ERROR_BAD_UNIT (20). The ARP handle
         // has already proven that it can inject on this adapter, and capture
         // filters do not restrict packets sent through a handle.
-        var activeDevice = PacketInjectionPolicy.SelectHandle(arpDevice, forwardingDevice);
         var frames = PacketInjectionPolicy.PrepareFrames(bytes);
         for (var index = 0; index < frames.Count; index++)
         {
             var frame = frames[index];
             try
             {
-                lock (arpSendSync)
-                {
-                    activeDevice.SendPacket(frame);
-                }
+                SendInjectionPacket(frame);
             }
             catch (Exception exception)
             {
@@ -1084,6 +1078,16 @@ public sealed class PcapLanEngine : IAsyncDisposable
                     $"segment {index + 1}/{frames.Count}): {exception.Message}",
                     exception);
             }
+        }
+    }
+
+    private void SendInjectionPacket(byte[] bytes)
+    {
+        lock (arpSendSync)
+        {
+            injectionDevice = PacketInjectionPolicy.SendUsingFirstWorkingHandle(
+                [injectionDevice, arpDevice, forwardingDevice],
+                device => device.SendPacket(bytes));
         }
     }
 
