@@ -235,7 +235,11 @@ The publishing script creates the portable application and installer in the
 `outputs` folder.
 
 The Linux AppImage is built from the Avalonia project and the packaging scripts
-under `packaging/linux`. The reproducible compatibility image uses Ubuntu 20.04:
+under `packaging/linux`. The reproducible compatibility image uses Ubuntu 20.04.
+
+The AppImage uses gzip/zlib compression for compatibility with AppImageLauncher
+2.2.0 and the current AppImage runtime. Building requires `squashfs-tools`, which
+is included in `packaging/linux/Dockerfile.appimage`.
 
 ```bash
 dotnet test ./tests/Lantern.Linux.Tests/Lantern.Linux.Tests.csproj -c Release

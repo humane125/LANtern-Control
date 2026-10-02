@@ -14,6 +14,7 @@ RUN apt-get update && \
         libfreetype6 \
         libcap2-bin \
         libpcap0.8 \
+        squashfs-tools \
         zlib1g && \
     rm -rf /var/lib/apt/lists/*
 

@@ -21,7 +21,7 @@ case "$work_dir" in
     ;;
 esac
 
-for command_name in curl ethtool getcap ldconfig setcap sha256sum; do
+for command_name in curl ethtool getcap ldconfig mksquashfs setcap sha256sum; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Missing required build command: $command_name" >&2
     exit 2
@@ -132,6 +132,8 @@ install -Dm755 "$script_dir/AppRun" "$app_dir/AppRun"
 install -Dm755 "$script_dir/install-privileged.sh" \
   "$app_dir/usr/libexec/lantern-control/install-privileged"
 printf '%s\n' "$version" > "$app_dir/usr/share/lantern-control/version"
+install -Dm644 "$script_dir/io.github.humane125.LANternControl.metainfo.xml" \
+  "$app_dir/usr/share/metainfo/io.github.humane125.LANternControl.metainfo.xml"
 payload_hash=$(
   cd "$app_dir/usr"
   find . \( -type f -o -type l \) ! -path './share/lantern-control/payload.sha256' -print0 |
@@ -157,7 +159,10 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
 fi
 
 rm -f -- "$output"
-ARCH=$architecture "$appimagetool" --appimage-extract-and-run "$app_dir" "$output"
+# gzip works with AppImageLauncher 2.2 and the current zlib/zstd-only runtime.
+# appimagetool bundles a zstd-only compressor, so use the host's mksquashfs.
+(cd "$tool_dir" && "$appimagetool" --appimage-extract >/dev/null)
+ARCH=$architecture "$tool_dir/squashfs-root/usr/bin/appimagetool" --comp gzip "$app_dir" "$output"
 chmod +x "$output"
 
 echo "$output"
