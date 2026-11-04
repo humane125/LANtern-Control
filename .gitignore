@@ -17,3 +17,4 @@ staging/
 squashfs-root/
 packaging/wix/
 docs/superpowers/
+.DS_Store

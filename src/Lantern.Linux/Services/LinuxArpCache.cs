@@ -1,19 +1,14 @@
 using System.Globalization;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 
 namespace Lantern.Linux.Services;
-
-public sealed record LinuxArpCacheEntry(
-    IPAddress Address,
-    PhysicalAddress MacAddress);
 
 public static class LinuxArpCache
 {
     private const string DefaultPath = "/proc/net/arp";
 
-    public static async Task<IReadOnlyList<LinuxArpCacheEntry>> ReadAsync(
+    public static async Task<IReadOnlyList<ArpCacheEntry>> ReadAsync(
         string interfaceName,
         IPAddress localAddress,
         int prefixLength,
@@ -23,7 +18,7 @@ public static class LinuxArpCache
         return Parse(output, interfaceName, localAddress, prefixLength);
     }
 
-    public static IReadOnlyList<LinuxArpCacheEntry> Parse(
+    public static IReadOnlyList<ArpCacheEntry> Parse(
         string output,
         string interfaceName,
         IPAddress localAddress,
@@ -31,18 +26,9 @@ public static class LinuxArpCache
     {
         ArgumentNullException.ThrowIfNull(output);
         ArgumentException.ThrowIfNullOrWhiteSpace(interfaceName);
-        ArgumentNullException.ThrowIfNull(localAddress);
-        if (localAddress.AddressFamily != AddressFamily.InterNetwork)
-        {
-            throw new ArgumentException("Only IPv4 adapters are supported.", nameof(localAddress));
-        }
+        ArpEntryFilter.ValidateSelection(localAddress, prefixLength);
 
-        if (prefixLength is < 0 or > 32)
-        {
-            throw new ArgumentOutOfRangeException(nameof(prefixLength));
-        }
-
-        var entries = new List<LinuxArpCacheEntry>();
+        var entries = new List<ArpCacheEntry>();
         var seen = new HashSet<IPAddress>();
         foreach (var line in output.Split('\n', StringSplitOptions.TrimEntries))
         {
@@ -55,13 +41,13 @@ public static class LinuxArpCache
                 !PhysicalAddress.TryParse(
                     fields[3].Replace(":", string.Empty, StringComparison.Ordinal),
                     out var macAddress) ||
-                !IsUsable(address, macAddress, localAddress, prefixLength) ||
+                !ArpEntryFilter.IsUsableNeighbor(address, macAddress, localAddress, prefixLength) ||
                 !seen.Add(address))
             {
                 continue;
             }
 
-            entries.Add(new LinuxArpCacheEntry(address, macAddress));
+            entries.Add(new ArpCacheEntry(address, macAddress));
         }
 
         return entries;
@@ -73,54 +59,4 @@ public static class LinuxArpCache
             NumberStyles.HexNumber,
             CultureInfo.InvariantCulture,
             out flags);
-
-    private static bool IsUsable(
-        IPAddress address,
-        PhysicalAddress macAddress,
-        IPAddress localAddress,
-        int prefixLength)
-    {
-        if (address.AddressFamily != AddressFamily.InterNetwork ||
-            address.Equals(localAddress) ||
-            !IsInSubnet(address, localAddress, prefixLength))
-        {
-            return false;
-        }
-
-        var mac = macAddress.GetAddressBytes();
-        if (mac.Length != 6 ||
-            mac.All(value => value == 0) ||
-            mac.All(value => value == byte.MaxValue) ||
-            (mac[0] & 1) != 0)
-        {
-            return false;
-        }
-
-        if (prefixLength >= 31)
-        {
-            return true;
-        }
-
-        var hostMask = uint.MaxValue >> prefixLength;
-        var value = ToUInt32(address);
-        return (value & hostMask) is not 0 && (value & hostMask) != hostMask;
-    }
-
-    private static bool IsInSubnet(
-        IPAddress address,
-        IPAddress localAddress,
-        int prefixLength)
-    {
-        var mask = prefixLength == 0 ? 0U : uint.MaxValue << (32 - prefixLength);
-        return (ToUInt32(address) & mask) == (ToUInt32(localAddress) & mask);
-    }
-
-    private static uint ToUInt32(IPAddress address)
-    {
-        var bytes = address.GetAddressBytes();
-        return ((uint)bytes[0] << 24) |
-               ((uint)bytes[1] << 16) |
-               ((uint)bytes[2] << 8) |
-               bytes[3];
-    }
 }

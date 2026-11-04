@@ -16,15 +16,31 @@ public sealed record LinuxInterfaceSnapshot(
 
 public static class LinuxAdapterService
 {
-    public static IReadOnlyList<AdapterProfile> GetUsableAdapters() =>
-        BuildProfiles(NetworkInterface.GetAllNetworkInterfaces().Select(CreateSnapshot));
+    public static IReadOnlyList<AdapterProfile> GetUsableAdapters()
+    {
+        var snapshots = NetworkInterface.GetAllNetworkInterfaces().Select(CreateSnapshot);
+        return BuildProfiles(OperatingSystem.IsMacOS() ? WithRealMacAddresses(snapshots) : snapshots);
+    }
+
+    private static IEnumerable<LinuxInterfaceSnapshot> WithRealMacAddresses(
+        IEnumerable<LinuxInterfaceSnapshot> snapshots)
+    {
+        var realMacs = MacInterfaceTable.ReadMacAddresses();
+        return snapshots.Select(snapshot =>
+            MacHardwareAddress.IsUnusable(snapshot.MacAddress) &&
+            realMacs.TryGetValue(snapshot.Name, out var mac)
+                ? snapshot with { MacAddress = mac }
+                : snapshot);
+    }
 
     public static IReadOnlyList<AdapterProfile> BuildProfiles(
         IEnumerable<LinuxInterfaceSnapshot> interfaces)
     {
         ArgumentNullException.ThrowIfNull(interfaces);
         return interfaces
-            .Where(item => item.IsUp && !item.MacAddress.Equals(PhysicalAddress.None))
+            .Where(item => item.IsUp &&
+                !item.MacAddress.Equals(PhysicalAddress.None) &&
+                !(OperatingSystem.IsMacOS() && MacHardwareAddress.IsUnusable(item.MacAddress)))
             .Select(item =>
             {
                 var address = item.Addresses.FirstOrDefault(candidate =>

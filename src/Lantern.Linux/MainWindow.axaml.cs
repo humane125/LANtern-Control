@@ -108,6 +108,12 @@ public partial class MainWindow : Window
 
     private async Task CheckForUpdatesAsync()
     {
+        // The release manifest has no macOS build, so a check would offer the Linux one.
+        if (OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
         var checkedAt = DateTimeOffset.UtcNow;
         if (!GitHubUpdateChecker.ShouldCheck(
                 settings.DisableUpdateChecks,
@@ -160,14 +166,22 @@ public partial class MainWindow : Window
             var adapters = LinuxAdapterService.GetUsableAdapters();
             AdapterSelector.ItemsSource = adapters;
             AdapterSelector.SelectedIndex = adapters.Count > 0 ? 0 : -1;
-            SetStatus(adapters.Count == 0
-                ? "No active IPv4 adapter with a gateway was found."
-                : "Ready. Start control to scan the selected LAN.");
+            SetStatus(adapters.Count > 0
+                ? "Ready. Start control to scan the selected LAN."
+                : EmptyAdapterMessage());
         }
         catch (Exception exception)
         {
             SetStatus($"Could not enumerate adapters: {exception.Message}");
         }
+    }
+
+    private static string EmptyAdapterMessage()
+    {
+        const string message = "No active IPv4 adapter with a gateway was found.";
+        return OperatingSystem.IsMacOS() && !Environment.IsPrivilegedProcess
+            ? $"{message} Start LANtern Control with administrator privileges."
+            : message;
     }
 
     private async void StartButton_OnClick(object? sender, RoutedEventArgs eventArgs)
@@ -197,9 +211,10 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            SetStatus(
-                $"Could not start Linux control: {exception.Message} " +
-                "Install libpcap and grant CAP_NET_RAW + CAP_NET_ADMIN, or run as root.");
+            var hint = OperatingSystem.IsMacOS()
+                ? "Launch LANtern Control with administrator privileges so it can open a capture device."
+                : "Install libpcap and grant CAP_NET_RAW + CAP_NET_ADMIN, or run as root.";
+            SetStatus($"Could not start control: {exception.Message} {hint}");
             SetActiveState(false);
         }
         finally
@@ -830,7 +845,16 @@ public partial class MainWindow : Window
             await StopEngineAsync();
         }
 
-        await settingsStore.SaveAsync(settings);
+        try
+        {
+            await settingsStore.SaveAsync(settings);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // An elevated run can leave the settings file root-owned; closing must not fail on it.
+            SetStatus($"Settings could not be saved on exit: {exception.Message}");
+        }
+
         closingAfterRestore = true;
         Close();
     }
