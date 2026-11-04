@@ -24,7 +24,8 @@ use case.
 
 > [!IMPORTANT]
 > Windows `v0.1.3` is the stable release. Linux `v0.1.0` is available as a
-> public beta AppImage. **macOS remains a work in progress (WIP).**
+> public beta AppImage. **macOS is available as a beta that you build from
+> source**; see [packaging/macos/README-MACOS.txt](packaging/macos/README-MACOS.txt).
 
 ## Features
 
@@ -84,6 +85,15 @@ libpcap. On first launch, it installs a protected payload under
 `/opt/lantern-control/0.1.0` and grants only `CAP_NET_RAW` and `CAP_NET_ADMIN`.
 The desktop interface continues to run as the normal user.
 
+### macOS beta
+
+- macOS 15 or later on Apple Silicon or Intel.
+- Administrator access. Opening a packet-capture device requires root.
+- The .NET 8 SDK to build the app.
+
+macOS already includes libpcap and the networking tools LANtern uses, so
+nothing else needs to be installed.
+
 ### Network
 
 - The controller computer and target devices must be on the same IPv4 broadcast
@@ -134,13 +144,31 @@ Download the latest version from [GitHub Releases](https://github.com/humane125/
    APPIMAGE_EXTRACT_AND_RUN=1 ./LANtern-Control-v0.1.0-x86_64.AppImage
    ```
 
+### macOS beta
+
+1. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download) and build the
+   app bundle:
+
+   ```bash
+   packaging/macos/build-app.sh
+   ```
+
+2. Open `dist/LANtern Control.app` and approve the administrator prompt. The app
+   is not notarized, so the first time either right-click it and choose **Open**
+   or clear the quarantine flag once:
+
+   ```bash
+   xattr -dr com.apple.quarantine "dist/LANtern Control.app"
+   ```
+
 Always click **Stop & restore** before closing LANtern, changing networks,
 disconnecting the selected adapter, suspending, or rebooting.
 
 ## How to use
 
 1. On Windows, launch LANtern Control as Administrator. On Linux, open the
-   configured AppImage normally after completing its one-time setup.
+   configured AppImage normally after completing its one-time setup. On macOS,
+   open the app bundle and approve the administrator prompt.
 2. Select the network adapter whose local IP address and gateway match the
    network you want to manage.
 3. Click **Start control** and wait for connected devices to appear.

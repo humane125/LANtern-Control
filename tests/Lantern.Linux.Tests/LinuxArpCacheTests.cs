@@ -63,10 +63,10 @@ public sealed class LinuxArpCacheTests
             PhysicalAddress.Parse("345A6063C052"));
         var entries = new[]
         {
-            new LinuxArpCacheEntry(
+            new ArpCacheEntry(
                 IPAddress.Parse("192.168.31.213"),
                 PhysicalAddress.Parse("0E4F69CCE4F0")),
-            new LinuxArpCacheEntry(
+            new ArpCacheEntry(
                 IPAddress.Parse("192.168.31.225"),
                 profile.LocalMac),
         };

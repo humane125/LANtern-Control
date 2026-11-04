@@ -37,8 +37,8 @@ public sealed class LinuxLanEngine : IAsyncDisposable
     private PhysicalAddress? gatewayMac;
     private FrameRouter? frameRouter;
     private LinuxFramePacer? framePacer;
-    private LinuxOffloadSession? offloadSession;
-    private LinuxIpForwardingSession? ipForwardingSession;
+    private IAsyncDisposable? offloadSession;
+    private IAsyncDisposable? ipForwardingSession;
     private TaskCompletionSource<PhysicalAddress>? gatewayResolution;
     private ConcurrentDictionary<IPAddress, PhysicalAddress>? activeProbeReplies;
     private ConcurrentDictionary<string, IPAddress>? activeKnownDeviceReplies;
@@ -110,19 +110,19 @@ public sealed class LinuxLanEngine : IAsyncDisposable
         gatewayResolution = new TaskCompletionSource<PhysicalAddress>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
+        // libpcap on macOS can report a placeholder MAC, so match by interface name there.
         var captureDevice = LibPcapLiveDeviceList.Instance
-            .FirstOrDefault(candidate => candidate.MacAddress?.Equals(adapter.LocalMac) == true)
+            .FirstOrDefault(candidate => OperatingSystem.IsMacOS()
+                ? candidate.Name == adapter.Name
+                : candidate.MacAddress?.Equals(adapter.LocalMac) == true)
             ?? throw new InvalidOperationException(
-                $"libpcap could not match the Linux adapter '{adapter.Name}'.");
+                $"libpcap could not match the adapter '{adapter.Name}'.");
 
         try
         {
             RaiseStatus($"Preparing adapter {adapter.Name} for packet forwarding...");
-            ipForwardingSession = await LinuxIpForwardingManager.DisableAsync(
-                cancellationToken);
-            offloadSession = await LinuxOffloadManager.DisableAsync(
-                adapter.Name,
-                cancellationToken);
+            ipForwardingSession = await HostIpForwarding.DisableAsync(cancellationToken);
+            offloadSession = await HostOffloads.DisableAsync(adapter.Name, cancellationToken);
 
             arpDevice = captureDevice;
             arpDevice.OnPacketArrival += OnArpPacketArrival;
@@ -196,7 +196,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
                 forwardingTask,
                 RunMaintenanceAsync(engineCancellation.Token));
             const string activeMessage =
-                "Linux control active - live traffic is routed through this computer.";
+                "Control active - live traffic is routed through this computer.";
             RaiseStatus(activeMessage);
             RaiseStateChanged(true, activeMessage);
         }
@@ -235,7 +235,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
                     activeProfile,
                     cancellationToken);
                 probes += await ProbeSubnetAsync(activeProfile, cancellationToken);
-                var cached = await LinuxArpCache.ReadAsync(
+                var cached = await HostArpCache.ReadAsync(
                     activeProfile.Name,
                     activeProfile.LocalAddress,
                     activeProfile.PrefixLength,
@@ -453,7 +453,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
         AdapterProfile activeProfile,
         CancellationToken cancellationToken)
     {
-        var cached = await LinuxArpCache.ReadAsync(
+        var cached = await HostArpCache.ReadAsync(
             activeProfile.Name,
             activeProfile.LocalAddress,
             activeProfile.PrefixLength,
@@ -484,7 +484,7 @@ public sealed class LinuxLanEngine : IAsyncDisposable
 
     private int ImportCachedNeighbors(
         AdapterProfile activeProfile,
-        IReadOnlyList<LinuxArpCacheEntry> cached)
+        IReadOnlyList<ArpCacheEntry> cached)
     {
         var imported = 0;
         foreach (var entry in cached)
